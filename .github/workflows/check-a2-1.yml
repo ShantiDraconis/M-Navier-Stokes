@@ -5,18 +5,18 @@ on:
     branches:
       - a2.1-weightedIBP
     paths:
-      - 'A2/TestA2-1.lean'
-      - 'A2/Common.lean'
+      - 'A2/**'
       - 'Core/**'
       - 'lakefile.lean'
+      - 'lake-manifest.json'
       - 'lean-toolchain'
       - '.github/workflows/check-a2-1.yml'
   pull_request:
     paths:
-      - 'A2/TestA2-1.lean'
-      - 'A2/Common.lean'
+      - 'A2/**'
       - 'Core/**'
       - 'lakefile.lean'
+      - 'lake-manifest.json'
       - 'lean-toolchain'
       - '.github/workflows/check-a2-1.yml'
   workflow_dispatch:
@@ -26,9 +26,47 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: leanprover/lean-action@v1
-        with:
-          lake-package-directory: '.'
-          build: false
-      - name: Compile A2.1 only
+
+      - name: Install Lean 4.32.1
+        run: |
+          curl https://elan.lean-lang.org/elan-init.sh -sSf | sh -s -- -y --default-toolchain leanprover/lean4:v4.32.1
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Record environment
+        run: |
+          lean --version
+          lake --version
+          git rev-parse HEAD
+          cat lean-toolchain
+          cat lakefile.lean
+
+      - name: Generate real Lake manifest
+        run: |
+          lake update
+          test -s lake-manifest.json
+          echo '=== lake-manifest.json sha256 ==='
+          sha256sum lake-manifest.json
+
+      - name: Fetch Mathlib cache
+        run: lake exe cache get
+
+      - name: Compile reconstructed Core/G1
+        run: lake build G1
+
+      - name: Compile A2.1 baseline
         run: lake env lean A2/TestA2-1.lean
+
+      - name: Audit forbidden placeholders
+        run: |
+          if grep -R -n -E '\bsorry\b|\badmit\b' Core A2 --include='*.lean'; then
+            echo 'Forbidden Lean placeholder found.'
+            exit 1
+          fi
+
+      - name: Certificate summary
+        run: |
+          echo "CERT_SHA=$GITHUB_SHA"
+          echo "LEAN=$(lean --version | head -1)"
+          echo "LAKE=$(lake --version | head -1)"
+          echo "MANIFEST_SHA256=$(sha256sum lake-manifest.json | cut -d' ' -f1)"
+          echo 'A2_1_BASELINE=GREEN'
