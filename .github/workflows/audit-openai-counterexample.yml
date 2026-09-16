@@ -1,0 +1,43 @@
+name: audit-openai-counterexample
+
+on:
+  push:
+    branches: [audit/openai-counterexample]
+    paths:
+      - 'Audit/OpenAI/**'
+      - '.github/workflows/audit-openai-counterexample.yml'
+      - 'lakefile.lean'
+      - 'lean-toolchain'
+  workflow_dispatch:
+
+jobs:
+  audit-scaffold:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Lean
+        run: |
+          curl https://elan.lean-lang.org/elan-init.sh -sSf | sh -s -- -y --default-toolchain leanprover/lean4:v4.32.1
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Bootstrap dependencies
+        run: |
+          lake update
+          lake exe cache get
+      - name: Verify frozen upstream lock
+        run: |
+          grep -qx 'repository=openai/NavierStokesAndEuler' Audit/OpenAI/upstream.lock
+          grep -qx 'commit=f9e8bc5b38b6e212696e8a30e3e91517af887bbd' Audit/OpenAI/upstream.lock
+          grep -qx 'tree=a503f07635f200c0f2f9c5361df1fa07f95c4741' Audit/OpenAI/upstream.lock
+      - name: Compile audit harness
+        run: lake env lean Audit/OpenAI/CounterexampleHarness.lean
+      - name: Reject Lean placeholders
+        run: |
+          if grep -R -n -E '\bsorry\b|\badmit\b' Audit/OpenAI --include='*.lean'; then
+            exit 1
+          fi
+      - name: Log certificate environment
+        run: |
+          echo "LOCAL_SHA=$GITHUB_SHA"
+          lean --version
+          lake --version
+          sha256sum Audit/OpenAI/upstream.lock Audit/OpenAI/attack_matrix.tsv Audit/OpenAI/certificate.schema.json
