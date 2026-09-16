@@ -1,0 +1,15 @@
+id	layer	target	attack_classes	upstream_path	upstream_symbol	status	local_certificate
+OA00	provenance	upstream revision	sha/tree/version			LOCKED	upstream.lock
+OA01	statement	Clay/Comparator equivalence	quantifiers;domains;definitions	ComparatorChallenges/NavierStokes.lean		PENDING	
+OA02	definitions	velocity/pressure/forcing solution model	degenerate models;vacuity;coercions	ComparatorChallenges/NavierStokes.lean		PENDING	
+OA03	initial-data	regularity and divergence-free	boundary;zero/nonzero;support	NavierStokes/		PENDING	
+OA04	PDE	Navier-Stokes identity	sign;constants;pressure;viscosity	NavierStokes/		PENDING	
+OA05	forcing	forcing construction	regularity;support;integrability;cancellation	NavierStokes/		PENDING	
+OA06	smoothness	space-time smoothness	endpoint;domain;extension	NavierStokes/		PENDING	
+OA07	energy	uniform/global energy condition	MemLp;norm;time quantifier	NavierStokes/		PENDING	
+OA08	construction	explicit blow-up mechanism	parameter boundaries;denominators;positivity	NavierStokes/		PENDING	
+OA09	continuation	finite-time obstruction	continuation assumptions;endpoint	NavierStokes/ActivationContinuation.lean		PENDING	
+OA10	conclusion	R3 alternative C	premise-to-conclusion semantic bridge	NavierStokes/PaperResults.lean		PENDING	
+OA11	conclusion	periodic alternative D	premise-to-conclusion semantic bridge	NavierStokes/PaperResults.lean		PENDING	
+OA12	crosscheck	paper vs Lean vs Comparator	statement drift;missing hypotheses	README.md;formalization.yaml		PENDING	
+OA13	crosscheck	OpenAI vs Campanato	strict hypothesis/conclusion comparison	Audit/OpenAI/		PENDING	
