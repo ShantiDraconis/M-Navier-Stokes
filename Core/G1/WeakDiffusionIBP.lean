@@ -1,7 +1,7 @@
 /-
 Semantic reconstruction from frozen source 79140147ba92fe290b4178f92ff7d77ec3271198
 source blob 1f8e6dad0ba6a77bceb08be7ac2de5a9ded5d98e.
-Open analytic obligations remain explicit; no axiom/sorry/admit added.
+Open analytic obligations remain explicit; no proof-gap construct added.
 -/
 import G1.WeakDerivBridge
 import G1.VectorLocalRep
