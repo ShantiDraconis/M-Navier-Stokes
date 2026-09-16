@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OpenAI Navier-Stokes adversarial audit certificate",
+  "type": "object",
+  "required": ["id", "upstream", "target", "classification", "local"],
+  "properties": {
+    "id": {"type": "string"},
+    "upstream": {
+      "type": "object",
+      "required": ["repository", "commit", "path", "symbol"],
+      "properties": {
+        "repository": {"const": "openai/NavierStokesAndEuler"},
+        "commit": {"const": "f9e8bc5b38b6e212696e8a30e3e91517af887bbd"},
+        "path": {"type": "string"},
+        "symbol": {"type": "string"},
+        "statement_sha256": {"type": "string"}
+      }
+    },
+    "target": {
+      "type": "object",
+      "required": ["premises", "conclusion", "attack_class"],
+      "properties": {
+        "premises": {"type": "array", "items": {"type": "string"}},
+        "conclusion": {"type": "string"},
+        "attack_class": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "witness": {
+      "type": ["object", "null"],
+      "properties": {
+        "description": {"type": "string"},
+        "premises_verified": {"type": "boolean"},
+        "conclusion_refuted": {"type": "boolean"},
+        "semantic_model_verified": {"type": "boolean"}
+      }
+    },
+    "classification": {
+      "enum": ["UPSTREAM_PROVED", "REPRODUCED_LEAN", "TESTED_NO_COUNTEREXAMPLE", "COUNTEREXAMPLE_CANDIDATE", "COUNTEREXAMPLE_LEAN", "SPECIFICATION_GAP", "OPEN_BRIDGE", "OUR_EXTENSION_PROVED"]
+    },
+    "local": {
+      "type": "object",
+      "required": ["commit", "lean", "mathlib", "ci_run", "axioms"],
+      "properties": {
+        "commit": {"type": "string"},
+        "lean": {"type": "string"},
+        "mathlib": {"type": "string"},
+        "ci_run": {"type": ["integer", "null"]},
+        "ci_job": {"type": ["integer", "null"]},
+        "axioms": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "notes": {"type": "string"}
+  }
+}
