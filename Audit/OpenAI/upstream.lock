@@ -1,0 +1,6 @@
+repository=openai/NavierStokesAndEuler
+commit=f9e8bc5b38b6e212696e8a30e3e91517af887bbd
+tree=a503f07635f200c0f2f9c5361df1fa07f95c4741
+author_date=2026-09-10T11:51:24Z
+committer_date=2026-09-10T13:40:53Z
+policy=immutable-reference
