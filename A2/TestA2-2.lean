@@ -1,9 +1,9 @@
 /-
-A2.2 successor harness: remove target-as-input laundering.
+A2.2 successor harness: laundering-free mathematical boundary.
 
-Scientific boundary: this file does not assert the missing analytic Campanato
-recurrence.  It separates raw inputs from derived contraction data so that
-`gamma < 1/2` can only enter downstream through an explicit derivation.
+Scientific boundary: the missing analytic Campanato recurrence and the strict
+subcritical budget are conclusions to be independently established, not raw
+inputs hidden in data structures.
 -/
 import G1.WeakDiffusionIBP
 import G1.SignedFarField
@@ -13,11 +13,9 @@ noncomputable section
 
 namespace G1Audit
 
-/-- Mechanical A2.1 identity; its analytic provenance remains separately audited. -/
 def A2WeightedIBPResult (d : WeightedDualityComponent) : Prop :=
   d.lapPair = -d.bulk - d.cutoffCross - d.weightCross
 
-/-- Raw signed-cancellation inputs.  The contraction target is deliberately absent. -/
 structure A2SignedCancellationInputs where
   farValue : ℝ
   nu : ℝ
@@ -63,7 +61,6 @@ structure A2SignedFarFieldInput where
   value : ℝ
   hvalue : value = signedFarField Kdata D geom xi omega mag phi
 
-/-- Exact scalar Campanato profile.  The functional is data; recurrence is not. -/
 structure CampanatoProfile where
   J : ℝ → ℝ
   nonneg : ∀ r, 0 ≤ J r
@@ -78,25 +75,23 @@ structure CampanatoFromWeightedInputs where
   C : ℝ
   hC_nonneg : 0 ≤ C
 
-/-- The actual one-step recurrence to be established by the analytic bridge. -/
 def CampanatoOneStep (I : CampanatoFromWeightedInputs) : Prop :=
   I.profile.J (I.scaling.r / 2) ≤
     I.cancellation.gamma * I.profile.J I.scaling.r +
       I.scaling.A * I.scaling.ratio
 
-/-- Derived contraction evidence is a result object, never an input to A2.2. -/
+/-- Result object: both fields must be derived; neither is raw input data. -/
 structure A2DerivedContraction (I : CampanatoFromWeightedInputs) where
   oneStep : CampanatoOneStep I
   gamma_lt_half : I.cancellation.gamma < (1 : ℝ) / 2
 
-/-- Algebraic closure may be used only as an explicitly separate downstream certificate. -/
-theorem contraction_from_independent_closure
+/-- Strict contraction requires a separately established subcritical budget. -/
+theorem contraction_from_independent_budget
     (I : CampanatoFromWeightedInputs)
-    (hA_pos : 0 < I.scaling.A)
-    (hC_pos : 0 < I.C)
-    (hclosure : LinearClosure I.cancellation.gamma I.scaling.A I.C) :
+    (hclosure : LinearClosure I.cancellation.gamma I.scaling.A I.C)
+    (hbudget : SubcriticalBudget I.cancellation.gamma I.scaling.A I.C) :
     I.cancellation.gamma < (1 : ℝ) / 2 := by
-  exact gamma_lt_half_of_linearClosure hA_pos hC_pos hclosure
+  exact gamma_lt_half_of_subcriticalBudget hclosure hbudget
 
 theorem testA2_2_signedFarField_visible (I : CampanatoFromWeightedInputs) :
     I.signedFar.value =
