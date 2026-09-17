@@ -1,10 +1,10 @@
 /-
 A2.2 / K4 signed far-field analytic layer.
 
-The primitive object is the actual signed far-field integral.  This file does
-not assume the desired signed-CZ estimate.  K4's physical directional model is
+The primitive object is the actual signed far-field integral. This file does
+not assume the desired signed-CZ estimate. K4's physical directional model is
 made explicit: magnitude is carried by `mag`, while the contraction consumes
-directions `xi x` and `xi y`.  This removes the previous double-counting risk
+directions `xi x` and `xi y`. This removes the previous double-counting risk
 where raw `omega y` entered both the contraction and `mag y`.
 -/
 import Mathlib
@@ -72,11 +72,21 @@ structure CZKernelSpec (Kdata : StrainKernelData) : Prop where
   /-- Typed homogeneity contract for a concrete scalar strain-kernel component. -/
   homogeneous_degree_three : ∀ (a : ℝ), 0 < a → ∀ z : Point3,
     Kdata.kernel (a⁻¹ • z) = a ^ 3 * Kdata.kernel z
-  /-- Smoothness/gradient estimate remains an explicit analytic debt until the
-      concrete strain kernel derivative is encoded. -/
-  gradient_decay : Prop
-  /-- Spherical/annular mean-zero remains an explicit analytic debt. -/
-  annular_mean_zero : Prop
+  /-- The gradient estimate is kept explicit and quantitative rather than an
+      opaque marker.  `gradKernel` is the derivative object supplied by the
+      eventual concrete kernel specialization. -/
+  gradKernel : Point3 → Point3
+  grad_measurable : Measurable gradKernel
+  gradient_decay : ∀ z : Point3, z ≠ 0 →
+    ‖gradKernel z‖ ≤ Cgrad / ‖z‖ ^ 4
+
+/-- Typed cancellation datum.  It is deliberately an integral identity for a
+concrete annular/spherical parameterization supplied by the specialization;
+no Boolean OPEN_CZ marker is permitted. -/
+structure KernelCancellationSpec (Kdata : StrainKernelData) : Prop where
+  angularKernel : Point3 → ℝ
+  angularIntegrable : Integrable angularKernel
+  mean_zero : ∫ theta, angularKernel theta = 0
 
 /-! ## K4.2 -- exact integrability debt -/
 
@@ -106,14 +116,7 @@ structure SignedCancellationWitness
     signedFarFieldIntegral Kdata D geom xi mag phi =
       ∫ y, cancelledIntegrand y
 
-/-! ## Scaling firewall
-
-`SignedDirectionContraction` is now applied only to direction fields.  To audit
-raw-vorticity scaling without assuming any special algebraic law for `D`, we
-hold `xi` fixed and scale only the independent magnitude field.  The exact
-integrand is then homogeneous of degree one in that magnitude.  In particular,
-there is no hidden second factor of raw vorticity inside `D.contract`.
--/
+/-! ## Scaling firewall -/
 
 def MagnitudeScalingDegreeOne
     (Kdata : StrainKernelData)
