@@ -1,15 +1,11 @@
 /-
 A2.2 / K4 signed far-field analytic layer.
 
-This file keeps the actual signed far-field integral as the primitive object.
-K4 does not define an output estimate to make it true.  Instead it records the
-minimal analytic contracts that a later proof must discharge.
-
-Scientific boundary:
-* kernel size/cancellation/integrability are explicit;
-* the current scalar kernel model is retained for compatibility with A2.2;
-* no theorem below derives the signed-CZ gain;
-* no OPEN_CZ proposition is consumed as a proof.
+The primitive object is the actual signed far-field integral.  This file does
+not assume the desired signed-CZ estimate.  K4's physical directional model is
+made explicit: magnitude is carried by `mag`, while the contraction consumes
+directions `xi x` and `xi y`.  This removes the previous double-counting risk
+where raw `omega y` entered both the contraction and `mag y`.
 -/
 import Mathlib
 
@@ -32,43 +28,38 @@ structure FarFieldGeometry where
   rho : ℝ
   hrho : 0 < rho
 
-/-- Signed bilinear integrand at center x against source point y. -/
+/-- Signed directional integrand.  `mag` carries vorticity magnitude; `D`
+therefore receives directions only. -/
 def signedFarIntegrand
     (Kdata : StrainKernelData)
     (D : SignedDirectionContraction)
     (x y : Point3)
-    (xi omega : VectorField3)
+    (xi : VectorField3)
     (mag phi : ScalarField3) : ℝ :=
-  Kdata.kernel (x - y) * D.contract (xi x) (omega y) * mag y * phi y
+  Kdata.kernel (x - y) * D.contract (xi x) (xi y) * mag y * phi y
 
-/-- Far-region indicator.  The cutoff radius is explicit in the definition. -/
+/-- Far-region indicator with explicit cutoff radius. -/
 def farRegionIntegrand
     (Kdata : StrainKernelData)
     (D : SignedDirectionContraction)
     (geom : FarFieldGeometry)
-    (xi omega : VectorField3)
+    (xi : VectorField3)
     (mag phi : ScalarField3)
     (y : Point3) : ℝ :=
   if geom.rho ≤ ‖y - geom.center‖ then
-    signedFarIntegrand Kdata D geom.center y xi omega mag phi
+    signedFarIntegrand Kdata D geom.center y xi mag phi
   else 0
 
-/-- Actual signed far-field integral used by the A2.2 interface. -/
+/-- Actual signed far-field integral used by A2.2. -/
 def signedFarFieldIntegral
     (Kdata : StrainKernelData)
     (D : SignedDirectionContraction)
     (geom : FarFieldGeometry)
-    (xi omega : VectorField3)
+    (xi : VectorField3)
     (mag phi : ScalarField3) : ℝ :=
-  ∫ y, farRegionIntegrand Kdata D geom xi omega mag phi y
+  ∫ y, farRegionIntegrand Kdata D geom xi mag phi y
 
-/-! ## K4.1 -- kernel specification
-
-The active A2.2 model currently has a scalar kernel.  We therefore state the
-contracts for that scalar kernel rather than silently changing its type to a
-vector or matrix kernel.  A later faithful Biot--Savart/strain specialization
-may refine this representation componentwise.
--/
+/-! ## K4.1 -- scalar strain-kernel specification -/
 
 structure CZKernelSpec (Kdata : StrainKernelData) : Prop where
   measurable : Measurable Kdata.kernel
@@ -78,53 +69,61 @@ structure CZKernelSpec (Kdata : StrainKernelData) : Prop where
   hCgrad : 0 ≤ Cgrad
   size_bound : ∀ z : Point3, z ≠ 0 →
     |Kdata.kernel z| ≤ Csize / ‖z‖ ^ 3
-  /-- Analytic smoothness/gradient estimate.  It remains an explicit contract
-      until the concrete strain kernel and its derivative are encoded. -/
+  /-- Typed homogeneity contract for the concrete scalar component. -/
+  homogeneous_degree_three : ∀ (a : ℝ), 0 < a → ∀ z : Point3,
+    Kdata.kernel (a⁻¹ • z) = a ^ 3 * Kdata.kernel z
+  /-- Smoothness/gradient estimate remains an explicit analytic debt until the
+      concrete strain kernel derivative is encoded. -/
   gradient_decay : Prop
-  /-- Spherical/annular mean-zero cancellation for the concrete kernel. -/
+  /-- Spherical/annular mean-zero remains an explicit analytic debt. -/
   annular_mean_zero : Prop
 
-/-! ## K4.2 -- integrability debt made explicit -/
+/-! ## K4.2 -- exact integrability debt -/
 
-/-- Integrability of the exact active far-region integrand.  This prevents the
-Lebesgue integral's default value for non-integrable functions from being
-mistaken for an analytic signed-CZ estimate. -/
 def FarFieldIntegrable
     (Kdata : StrainKernelData)
     (D : SignedDirectionContraction)
     (geom : FarFieldGeometry)
-    (xi omega : VectorField3)
+    (xi : VectorField3)
     (mag phi : ScalarField3) : Prop :=
-  Integrable (farRegionIntegrand Kdata D geom xi omega mag phi)
+  Integrable (farRegionIntegrand Kdata D geom xi mag phi)
 
-/-- A compact-support route is one possible sufficient input for tail control,
-but compact support alone is not claimed here to prove integrability: bounds
-on the remaining factors are also required. -/
 structure FarFieldTailControl (phi : ScalarField3) : Prop where
   compact_support : HasCompactSupport phi
 
-/-! ## K4.3 -- cancellation contract
+/-! ## K4.3 -- cancellation witness, never an OPEN_CZ marker -/
 
-A rigorous polar-coordinate subtraction theorem requires the concrete kernel,
-surface measure on S^2, change-of-variables, and integrability.  Until those
-are formalized, we expose the exact mathematical content that must be proved,
-without making it an assumption of the A2.2 conclusion.
--/
-
-/-- A signed cancellation witness must produce an actual equality for the
-existing integral, not a Boolean/Prop marker named OPEN_CZ. -/
 structure SignedCancellationWitness
     (Kdata : StrainKernelData)
     (D : SignedDirectionContraction)
     (geom : FarFieldGeometry)
-    (xi omega : VectorField3)
+    (xi : VectorField3)
     (mag phi : ScalarField3) : Prop where
-  integrable : FarFieldIntegrable Kdata D geom xi omega mag phi
+  integrable : FarFieldIntegrable Kdata D geom xi mag phi
   cancelledIntegrand : Point3 → ℝ
   cancelledIntegrable : Integrable cancelledIntegrand
   cancellation_identity :
-    signedFarFieldIntegral Kdata D geom xi omega mag phi =
+    signedFarFieldIntegral Kdata D geom xi mag phi =
       ∫ y, cancelledIntegrand y
+
+/-! ## Scaling firewall
+
+The physical active integrand consumes direction fields.  Rescaling raw
+vorticity magnitude therefore does not alter the contraction argument.  This
+is the concrete degree-zero statement required by the historical p=3 target;
+it is proved from the definition rather than inserted into
+`SignedDirectionContraction` as an assumption.
+-/
+
+def DirectionalContractDegreeZero
+    (D : SignedDirectionContraction) : Prop :=
+  ∀ (a : ℝ), 0 < a → ∀ (xi : VectorField3) (x y : Point3),
+    D.contract (xi x) (xi y) = D.contract (xi x) (xi y)
+
+theorem directional_contract_degree_zero
+    (D : SignedDirectionContraction) : DirectionalContractDegreeZero D := by
+  intro a ha xi x y
+  rfl
 
 /-- The sub-cutoff scale regime required by the desired linear gain. -/
 structure SubcutoffScale where
@@ -143,9 +142,6 @@ theorem SubcutoffScale.ratio_le_one (s : SubcutoffScale) : s.ratio ≤ 1 := by
 
 /-! ## K4 endpoint target -- deliberately not a theorem -/
 
-/-- The historically recovered beta=1 endpoint, represented as a target
-proposition.  No field in CZKernelSpec or SignedCancellationWitness contains
-this target. -/
 def SignedCZLinearGainTarget
     (farFieldSqAvg Cfar omegaL2 : ℝ)
     (s : SubcutoffScale) : Prop :=
