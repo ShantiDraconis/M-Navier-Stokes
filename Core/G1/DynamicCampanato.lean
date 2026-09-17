@@ -1,16 +1,14 @@
 /-
-A2.2 reconstruction: algebraic dynamic Campanato bookkeeping.
+A2.2 dynamic Campanato arithmetic.
 
-Provenance:
-  origin: reconstructed
-  date: 2026-09-17
-  branch: next/a2-2-math
+Specification correction 2026-09-17:
+The provisional proposition `gamma + A*C < 1/2` was not the historical
+Campanato preservation condition.  The recovered source
+`navier-stokes-critical-barrier-audit@f4a688bcc940847f7d8084756fa9ff241c36a28f`
+uses `2*gamma*C + 2*A <= C` for the half-scale barrier.
 
-Audit boundary:
-  LinearClosure records only sign/boundedness data.  It deliberately contains
-  no strict contraction statement and cannot imply gamma < 1/2 by itself.
-  Any subcritical budget must therefore be supplied by an independently proved
-  theorem/certificate downstream.
+This file formalizes only that algebra.  It does not derive the preservation
+condition from the PDE/CZ/diffusion estimates.
 -/
 import Mathlib
 
@@ -18,23 +16,41 @@ noncomputable section
 
 namespace G1Audit
 
-/-- Assumption-safe algebraic bookkeeping; no A2.2 target is encoded here. -/
+/-- Sign bookkeeping only; it contains no contraction conclusion. -/
 def LinearClosure (gamma A C : ℝ) : Prop :=
   0 ≤ gamma ∧ 0 ≤ A ∧ 0 ≤ C
 
-/-- Explicit downstream budget proposition, kept separate from raw closure data. -/
-def SubcriticalBudget (gamma A C : ℝ) : Prop :=
-  gamma + A * C < (1 : ℝ) / 2
+/-- Historical dyadic half-scale preservation condition. -/
+def BarrierPreservation (gamma A C : ℝ) : Prop :=
+  2 * gamma * C + 2 * A ≤ C
 
-/-- A separately established subcritical budget yields strict contraction. -/
-theorem gamma_lt_half_of_subcriticalBudget
+/-- The historical barrier condition gives the coefficient bound needed for
+    the half-scale iteration. -/
+theorem coefficient_half_of_barrier
     {gamma A C : ℝ}
-    (hclosure : LinearClosure gamma A C)
-    (hbudget : SubcriticalBudget gamma A C) :
-    gamma < (1 : ℝ) / 2 := by
-  rcases hclosure with ⟨hgamma, hA, hC⟩
-  have hAC : 0 ≤ A * C := mul_nonneg hA hC
-  unfold SubcriticalBudget at hbudget
+    (hbudget : BarrierPreservation gamma A C) :
+    gamma * C + A ≤ C / 2 := by
+  unfold BarrierPreservation at hbudget
   linarith
+
+/-- With a genuinely positive inhomogeneous term and positive barrier size,
+    preservation forces strict gamma < 1/2.  This is algebra only. -/
+theorem gamma_lt_half_of_barrier
+    {gamma A C : ℝ}
+    (hC : 0 < C)
+    (hA : 0 < A)
+    (hbudget : BarrierPreservation gamma A C) :
+    gamma < (1 : ℝ) / 2 := by
+  unfold BarrierPreservation at hbudget
+  have hstrict : 2 * gamma * C < C := by
+    linarith
+  have hmul : gamma * (2 * C) < C := by
+    nlinarith
+  have h2C : 0 < 2 * C := by positivity
+  have hgamma : gamma < C / (2 * C) :=
+    (lt_div_iff h2C).2 hmul
+  have hfrac : C / (2 * C) = (1 : ℝ) / 2 := by
+    field_simp [hC.ne']
+  simpa [hfrac] using hgamma
 
 end G1Audit
