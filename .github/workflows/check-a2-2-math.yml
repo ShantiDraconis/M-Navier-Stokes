@@ -26,7 +26,9 @@ jobs:
       - name: Typecheck K4 signed-CZ definitions
         run: lake env lean Core/G1/K4SignedCZDefs.lean
       - name: Check K4 refutation frontier
-        run: lake env lean Core/G1/K4SignedCZRefutation.lean
+        run: |
+          lake build G1.K4SignedCZDefs
+          lake env lean Core/G1/K4SignedCZRefutation.lean
       - name: Regression A2.1
         run: lake env lean A2/TestA2-1.lean
       - name: Compile A2.2 historical barrier successor
