@@ -57,8 +57,6 @@ structure CZKernelSpec (Kdata : StrainKernelData) where
     HasFDerivAt Kdata.kernel (innerSL ℝ (gradKernel z)) z
   gradient_decay : ∀ z : Point3, z ≠ 0 → ‖gradKernel z‖ ≤ Cgrad / ‖z‖ ^ 4
 
-/-- Cancellation is imposed on the actual kernel over concrete annuli, not on
-an unrelated auxiliary angular function. -/
 structure KernelCancellationSpec (Kdata : StrainKernelData) where
   annularIntegrable : ∀ a b : ℝ, 0 < a → a < b →
     IntegrableOn Kdata.kernel (Metric.closedBall (0 : Point3) b \ Metric.ball (0 : Point3) a)
@@ -104,13 +102,13 @@ def signedFarFieldAt
     (x : Point3) : ℝ :=
   signedFarFieldIntegral Kdata D ⟨x, rho, hrho⟩ xi mag phi
 
+/-- The numerator and denominator now use the same open metric ball. -/
 def localBallSqIntegral
     (Kdata : StrainKernelData) (D : SignedDirectionContraction)
     (center : Point3) (rho : ℝ) (hrho : 0 < rho)
     (xi : VectorField3) (mag phi : ScalarField3) (r : ℝ) : ℝ :=
-  ∫ x, if ‖x - center‖ ≤ r then
+  ∫ x in Metric.ball center r,
     (signedFarFieldAt Kdata D rho hrho xi mag phi x) ^ 2
-  else 0
 
 def FarFieldSqAvg
     (Kdata : StrainKernelData) (D : SignedDirectionContraction)
@@ -138,17 +136,22 @@ structure UniformFarConstant where
   Cfar : ℝ
   hCfar : 0 ≤ Cfar
 
+/-- K4 is a strictly positive subcutoff-scale statement.  The degenerate
+r=0 case is excluded instead of dividing by the zero volume of an empty ball. -/
 structure SubcutoffScale where
   r : ℝ
   rho : ℝ
-  hr : 0 ≤ r
+  hr : 0 < r
   hrho : 0 < rho
   hr_le_rho : r ≤ rho
 
 def SubcutoffScale.ratio (s : SubcutoffScale) : ℝ := s.r / s.rho
 
+theorem SubcutoffScale.ratio_pos (s : SubcutoffScale) : 0 < s.ratio := by
+  exact div_pos s.hr s.hrho
+
 theorem SubcutoffScale.ratio_nonneg (s : SubcutoffScale) : 0 ≤ s.ratio := by
-  exact div_nonneg s.hr s.hrho.le
+  exact s.ratio_pos.le
 
 theorem SubcutoffScale.ratio_le_one (s : SubcutoffScale) : s.ratio ≤ 1 := by
   exact (div_le_one s.hrho).2 s.hr_le_rho
