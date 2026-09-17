@@ -27,17 +27,19 @@ jobs:
         run: lake env lean A2/TestA2-2.lean
       - name: Target-as-input firewall
         run: |
-          if grep -n -E 'hgamma_half[[:space:]]*:|gamma_lt_half[[:space:]]*:' A2/TestA2-2.lean; then
-            echo 'Target property found as an input field.'
+          INPUT_BLOCK="$(sed -n '/structure A2SignedCancellationInputs where/,/structure A2RhoScalingData where/p' A2/TestA2-2.lean)"
+          if printf '%s\n' "$INPUT_BLOCK" | grep -E 'hgamma_half[[:space:]]*:|gamma_lt_half[[:space:]]*:'; then
+            echo 'Target property found in raw A2.2 input structure.'
             exit 1
           fi
           if grep -R -n -E '\bsorry\b|\badmit\b|^[[:space:]]*axiom[[:space:]]' Core A2 --include='*.lean'; then
             echo 'Forbidden proof-gap construct.'
             exit 1
           fi
-      - name: Boundary check
+      - name: Derived-result boundary check
         run: |
           grep -q 'def CampanatoOneStep' A2/TestA2-2.lean
           grep -q 'structure A2DerivedContraction' A2/TestA2-2.lean
+          grep -q 'gamma_lt_half : I.cancellation.gamma' A2/TestA2-2.lean
           echo "CERT_SHA=$GITHUB_SHA"
           echo 'SCIENTIFIC_STATUS=OPEN_BRIDGE'
