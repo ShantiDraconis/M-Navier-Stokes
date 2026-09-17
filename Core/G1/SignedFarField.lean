@@ -69,20 +69,14 @@ structure CZKernelSpec (Kdata : StrainKernelData) : Prop where
   hCgrad : 0 ≤ Cgrad
   size_bound : ∀ z : Point3, z ≠ 0 →
     |Kdata.kernel z| ≤ Csize / ‖z‖ ^ 3
-  /-- Typed homogeneity contract for a concrete scalar strain-kernel component. -/
   homogeneous_degree_three : ∀ (a : ℝ), 0 < a → ∀ z : Point3,
     Kdata.kernel (a⁻¹ • z) = a ^ 3 * Kdata.kernel z
-  /-- The gradient estimate is kept explicit and quantitative rather than an
-      opaque marker.  `gradKernel` is the derivative object supplied by the
-      eventual concrete kernel specialization. -/
   gradKernel : Point3 → Point3
   grad_measurable : Measurable gradKernel
   gradient_decay : ∀ z : Point3, z ≠ 0 →
     ‖gradKernel z‖ ≤ Cgrad / ‖z‖ ^ 4
 
-/-- Typed cancellation datum.  It is deliberately an integral identity for a
-concrete annular/spherical parameterization supplied by the specialization;
-no Boolean OPEN_CZ marker is permitted. -/
+/-- Typed cancellation datum for a concrete angular representation. -/
 structure KernelCancellationSpec (Kdata : StrainKernelData) : Prop where
   angularKernel : Point3 → ℝ
   angularIntegrable : Integrable angularKernel
@@ -139,7 +133,54 @@ theorem signedFarIntegrand_magnitude_degree_one
   simp [signedFarIntegrand]
   ring
 
-/-- The sub-cutoff scale regime required by the desired linear gain. -/
+/-! ## Exact far-field square-average semantics
+
+The center dependence is represented explicitly by rebuilding the geometry at
+`x`.  `FarFieldSqAvg` is an actual integral over the local ball indicator,
+normalized by a supplied positive ball volume.  This is intentionally not an
+abstract scalar `farFieldSqAvg` input.
+-/
+
+def signedFarFieldAt
+    (Kdata : StrainKernelData)
+    (D : SignedDirectionContraction)
+    (rho : ℝ) (hrho : 0 < rho)
+    (xi : VectorField3)
+    (mag phi : ScalarField3)
+    (x : Point3) : ℝ :=
+  signedFarFieldIntegral Kdata D ⟨x, rho, hrho⟩ xi mag phi
+
+def localBallSqIntegral
+    (Kdata : StrainKernelData)
+    (D : SignedDirectionContraction)
+    (center : Point3)
+    (rho : ℝ) (hrho : 0 < rho)
+    (xi : VectorField3)
+    (mag phi : ScalarField3)
+    (r : ℝ) : ℝ :=
+  ∫ x, if ‖x - center‖ ≤ r then
+    (signedFarFieldAt Kdata D rho hrho xi mag phi x) ^ 2
+  else 0
+
+structure PositiveBallVolume where
+  volume : ℝ
+  hvolume : 0 < volume
+
+/-- Concrete normalized local square-average used by FP-K4-B. -/
+def FarFieldSqAvg
+    (Kdata : StrainKernelData)
+    (D : SignedDirectionContraction)
+    (center : Point3)
+    (rho : ℝ) (hrho : 0 < rho)
+    (xi : VectorField3)
+    (mag phi : ScalarField3)
+    (r : ℝ)
+    (ballVolume : PositiveBallVolume) : ℝ :=
+  localBallSqIntegral Kdata D center rho hrho xi mag phi r /
+    ballVolume.volume
+
+/-! ## Sub-cutoff scale and endpoint -/
+
 structure SubcutoffScale where
   r rho : ℝ
   hr : 0 ≤ r
@@ -154,8 +195,7 @@ theorem SubcutoffScale.ratio_nonneg (s : SubcutoffScale) : 0 ≤ s.ratio := by
 theorem SubcutoffScale.ratio_le_one (s : SubcutoffScale) : s.ratio ≤ 1 := by
   exact (div_le_one s.hrho).2 s.hr_le_rho
 
-/-! ## K4 endpoint target -- deliberately not a theorem -/
-
+/-- The historical p=3 endpoint, still a target rather than a theorem. -/
 def SignedCZLinearGainTarget
     (farFieldSqAvg Cfar omegaL2 : ℝ)
     (s : SubcutoffScale) : Prop :=
