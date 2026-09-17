@@ -2,7 +2,7 @@ name: check-a2-2-math
 
 on:
   push:
-    branches: [next/a2-2-math, next/a2-2-budget]
+    branches: [next/a2-2-math, next/a2-2-budget, next/a2-2-signed-cz]
     paths: ['A2/**','Core/**','audit/**','scripts/**','.github/workflows/check-a2-2-math.yml','lakefile.lean','lean-toolchain']
   workflow_dispatch:
 
@@ -25,6 +25,20 @@ jobs:
         run: lake env lean A2/TestA2-1.lean
       - name: Compile A2.2 historical barrier successor
         run: lake env lean A2/TestA2-2.lean
+      - name: Compile K4 scaling audit
+        run: lake env lean Core/G1/K4ScalingAudit.lean
+      - name: K4 scaling firewall
+        run: |
+          grep -q 'def K4ScalingDegrees.requiredRhoExponent' Core/G1/K4ScalingAudit.lean
+          grep -q '2 \* q.sK + 2 \* q.sD - 3' Core/G1/K4ScalingAudit.lean
+          grep -q 'theorem master_scaling_determinant' Core/G1/K4ScalingAudit.lean
+          grep -q 'theorem p3_forces_directional_degree_zero' Core/G1/K4ScalingAudit.lean
+          grep -q 'def ContractDegreeZero' Core/G1/K4ScalingAudit.lean
+          grep -q 'def K4P3ScalingAdmissible' Core/G1/K4ScalingAudit.lean
+          if grep -q 'sK + 2 \*.*sD - 3' Core/G1/K4ScalingAudit.lean; then
+            echo 'Incorrect unsquared-kernel exponent formula detected.'
+            exit 1
+          fi
       - name: Interface firewall
         run: |
           grep -q 'def signedFarFieldIntegral' Core/G1/SignedFarField.lean
@@ -72,3 +86,5 @@ jobs:
           echo 'NODE_CAMPANATO_ONE_STEP=OPEN_BRIDGE'
           echo 'NODE_BARRIER_PRESERVATION=OPEN_BRIDGE'
           echo 'NODE_DYADIC_BARRIER_ALGEBRA=PROVED_LEAN_CANDIDATE'
+          echo 'NODE_K4_SCALING_ALGEBRA=PROVED_LEAN_CANDIDATE'
+          echo 'NODE_K4_CONTRACT_DEGREE_ZERO=OPEN_BRIDGE'
