@@ -27,8 +27,8 @@ jobs:
         run: lake env lean Core/G1/K4SignedCZDefs.lean
       - name: Check K4 refutation frontier
         run: |
-          lake build G1.K4SignedCZDefs
-          lake env lean Core/G1/K4SignedCZRefutation.lean
+          lake build G1.K4SignedCZDefs G1.K4SignedCZRefutation
+          lake env lean Core/G1/AdmissibleAngularBlindWitness.lean
       - name: Regression A2.1
         run: lake env lean A2/TestA2-1.lean
       - name: Compile A2.2 historical barrier successor
@@ -64,10 +64,12 @@ jobs:
           grep -q 'def directionalOscillation' Core/G1/SignedFarField.lean
           grep -q 'structure DyadicFarEstimate (shellContribution' Core/G1/SignedFarField.lean
           grep -q 'theorem directionalOscillation_constant_zero' Core/G1/K4SignedCZRefutation.lean
+          grep -q 'structure AdmissibleAngularBlindWitness' Core/G1/AdmissibleAngularBlindWitness.lean
+          grep -q 'admissible_angular_blind_witness_refutes_single_oscillation_domination' Core/G1/AdmissibleAngularBlindWitness.lean
           if grep -q 'D.contract (xi x) (omega y)' Core/G1/SignedFarField.lean; then exit 1; fi
           if grep -E -q '^[[:space:]]*(def|structure|class|abbrev)[[:space:]]+(angularKernel|PositiveBallVolume)([[:space:]:({]|$)' Core/G1/SignedFarField.lean; then exit 1; fi
           if grep -E -q '^[[:space:]]*(oscillation[[:space:]]*:[[:space:]]*Point3|shellBound[[:space:]]*:)' Core/G1/SignedFarField.lean; then exit 1; fi
-          if grep -E -q '^[[:space:]]*(q\.)?sK[[:space:]]*\+[[:space:]]*2[[:space:]]*\*[[:space:]]*(q\.)?sD[[:space:]]*-[[:space:]]*3[[:space:]]*$' Core/G1/K4ScalingAudit.lean; then exit 1; fi
+          if grep -E -q '^[[:space:]]*(q\.)?sK[[:space:]]*\+[[:space:]]*2[[:space:]]*(q\.)?sD[[:space:]]*-[[:space:]]*3[[:space:]]*$' Core/G1/K4ScalingAudit.lean; then exit 1; fi
           if grep -q 'D.contract xi (lambda • omega)' Core/G1/K4ScalingAudit.lean; then exit 1; fi
       - name: No proof-gap constructs
         run: |
@@ -77,11 +79,12 @@ jobs:
       - name: Scientific boundary check
         run: |
           grep -q 'def AngularBlindCounterexampleWitness' Core/G1/K4SignedCZRefutation.lean
+          grep -q 'structure AdmissibleAngularBlindWitness' Core/G1/AdmissibleAngularBlindWitness.lean
           grep -q 'def SignedCZLinearGainTarget' Core/G1/SignedFarField.lean
           echo "CERT_SHA=$GITHUB_SHA"
           echo 'MECHANICAL_STATUS=TESTING'
           echo 'SCIENTIFIC_STATUS=OPEN_MATH'
           echo 'K4_NEW_MACRO_GATES=0'
-          echo 'K4_BRANCH_DECISION=PENDING_WITNESS_OR_EXCLUSION'
+          echo 'K4_BRANCH_DECISION=PENDING_ADMISSIBLE_WITNESS_OR_EXCLUSION'
           echo 'NODE_K4_SIGNED_CANCELLATION=OPEN_BRIDGE'
           echo 'NODE_K4_LINEAR_GAIN=OPEN_BRIDGE'
