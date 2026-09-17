@@ -32,7 +32,7 @@ structure AdmissibleAngularBlindWitness where
   cancellation : KernelCancellationSpec Kdata
   tail : FarFieldTailControl phi
   signed : SignedCancellationWitness
-    Kdata D ⟨center := center, rho := rho, hrho := hrho⟩
+    Kdata D ⟨center, rho, hrho⟩
       (fun _ : Point3 => v) mag phi
   farField_pos :
     0 < FarFieldSqAvg Kdata D center rho hrho (fun _ : Point3 => v) mag phi r
