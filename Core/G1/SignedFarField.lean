@@ -28,8 +28,8 @@ structure FarFieldGeometry where
   rho : ℝ
   hrho : 0 < rho
 
-/-- Signed directional integrand.  `mag` carries vorticity magnitude; `D`
-therefore receives directions only. -/
+/-- Signed directional integrand. `mag` carries vorticity magnitude, while
+`D` consumes direction data. -/
 def signedFarIntegrand
     (Kdata : StrainKernelData)
     (D : SignedDirectionContraction)
@@ -69,7 +69,7 @@ structure CZKernelSpec (Kdata : StrainKernelData) : Prop where
   hCgrad : 0 ≤ Cgrad
   size_bound : ∀ z : Point3, z ≠ 0 →
     |Kdata.kernel z| ≤ Csize / ‖z‖ ^ 3
-  /-- Typed homogeneity contract for the concrete scalar component. -/
+  /-- Typed homogeneity contract for a concrete scalar strain-kernel component. -/
   homogeneous_degree_three : ∀ (a : ℝ), 0 < a → ∀ z : Point3,
     Kdata.kernel (a⁻¹ • z) = a ^ 3 * Kdata.kernel z
   /-- Smoothness/gradient estimate remains an explicit analytic debt until the
@@ -108,22 +108,33 @@ structure SignedCancellationWitness
 
 /-! ## Scaling firewall
 
-The physical active integrand consumes direction fields.  Rescaling raw
-vorticity magnitude therefore does not alter the contraction argument.  This
-is the concrete degree-zero statement required by the historical p=3 target;
-it is proved from the definition rather than inserted into
-`SignedDirectionContraction` as an assumption.
+`SignedDirectionContraction` is now applied only to direction fields.  To audit
+raw-vorticity scaling without assuming any special algebraic law for `D`, we
+hold `xi` fixed and scale only the independent magnitude field.  The exact
+integrand is then homogeneous of degree one in that magnitude.  In particular,
+there is no hidden second factor of raw vorticity inside `D.contract`.
 -/
 
-def DirectionalContractDegreeZero
-    (D : SignedDirectionContraction) : Prop :=
-  ∀ (a : ℝ), 0 < a → ∀ (xi : VectorField3) (x y : Point3),
-    D.contract (xi x) (xi y) = D.contract (xi x) (xi y)
+def MagnitudeScalingDegreeOne
+    (Kdata : StrainKernelData)
+    (D : SignedDirectionContraction)
+    (x y : Point3)
+    (xi : VectorField3)
+    (mag phi : ScalarField3) : Prop :=
+  ∀ (a : ℝ),
+    signedFarIntegrand Kdata D x y xi (fun z => a * mag z) phi =
+      a * signedFarIntegrand Kdata D x y xi mag phi
 
-theorem directional_contract_degree_zero
-    (D : SignedDirectionContraction) : DirectionalContractDegreeZero D := by
-  intro a ha xi x y
-  rfl
+theorem signedFarIntegrand_magnitude_degree_one
+    (Kdata : StrainKernelData)
+    (D : SignedDirectionContraction)
+    (x y : Point3)
+    (xi : VectorField3)
+    (mag phi : ScalarField3) :
+    MagnitudeScalingDegreeOne Kdata D x y xi mag phi := by
+  intro a
+  simp [signedFarIntegrand]
+  ring
 
 /-- The sub-cutoff scale regime required by the desired linear gain. -/
 structure SubcutoffScale where
