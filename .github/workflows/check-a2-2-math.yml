@@ -65,6 +65,8 @@ jobs:
           grep -q 'gradient_decay : ∀' Core/G1/SignedFarField.lean
           grep -q 'structure KernelCancellationSpec' Core/G1/SignedFarField.lean
           grep -q 'mean_zero : ∫ theta, angularKernel theta = 0' Core/G1/SignedFarField.lean
+          grep -q 'def FarFieldSqAvg' Core/G1/SignedFarField.lean
+          grep -q 'def localBallSqIntegral' Core/G1/SignedFarField.lean
           if grep -q 'D.contract (xi x) (omega y)' Core/G1/SignedFarField.lean; then
             echo 'Raw vorticity is still double-counted inside the directional contraction.'
             exit 1
@@ -98,6 +100,7 @@ jobs:
           echo 'NODE_K4_SCALING=PROVED_LEAN_CANDIDATE'
           echo 'NODE_K4_DIRECTIONAL_MODEL=PROVED_LEAN_CANDIDATE'
           echo 'NODE_K4_KERNEL_ANALYTIC_CONTRACTS=TYPED_OPEN_BRIDGE'
+          echo 'NODE_K4_FAR_AVERAGE=DEFINED'
           echo 'NODE_K4_SIGNED_CANCELLATION=OPEN_BRIDGE'
           echo 'NODE_K4_LINEAR_GAIN=OPEN_BRIDGE'
           echo 'NODE_CAMPANATO_ONE_STEP=OPEN_BRIDGE'
