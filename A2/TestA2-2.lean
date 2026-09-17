@@ -5,7 +5,7 @@ Predecessor frozen boundary:
   82799845504653252e2a688ffd917aa9822485e1
 
 Scientific boundary: CampanatoOneStep and SubcriticalBudget remain separate
-open obligations.  Neither is stored in raw input data.
+open obligations. Neither is stored in raw input data.
 -/
 import G1.WeakDiffusionIBP
 import G1.SignedFarField
@@ -54,8 +54,6 @@ structure A2SignedFarFieldInput where
   omega : VectorField3
   mag : ScalarField3
   phi : ScalarField3
-  value : ℝ
-  hvalue : value = signedFarFieldIntegral Kdata D geom xi omega mag phi
 
 structure CampanatoProfile where
   J : ℝ → ℝ
@@ -71,7 +69,8 @@ structure CampanatoFromWeightedInputs where
   C : ℝ
   hC_nonneg : 0 ≤ C
   signedCancellation :
-    |signedFar.value| ≤
+    |signedFarFieldIntegral signedFar.Kdata signedFar.D signedFar.geom
+        signedFar.xi signedFar.omega signedFar.mag signedFar.phi| ≤
       cancellationData.gamma * cancellationData.nu * cancellationData.diffusionBulk +
       cancellationData.Ckappa * cancellationData.gradUSq * profile.J scaling.r +
       cancellationData.remainder
@@ -93,14 +92,10 @@ theorem contraction_from_independent_budget
     I.cancellationData.gamma < (1 : ℝ) / 2 := by
   exact gamma_lt_half_of_subcriticalBudget hclosure hbudget
 
-/-- Reproved after the pointwise scaffold was replaced by the integral object. -/
-theorem testA2_2_signedFarField_visible (I : CampanatoFromWeightedInputs) :
-    I.signedFar.value =
-      signedFarFieldIntegral I.signedFar.Kdata I.signedFar.D I.signedFar.geom
-        I.signedFar.xi I.signedFar.omega I.signedFar.mag I.signedFar.phi := by
-  exact I.signedFar.hvalue
-
 #print A2RhoScalingData.ratio
+#print signedFarIntegrand
+#print farRegionIntegrand
+#print signedFarFieldIntegral
 #print CampanatoOneStep
 #print LinearClosure
 #print SubcriticalBudget
