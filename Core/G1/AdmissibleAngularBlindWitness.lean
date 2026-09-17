@@ -23,7 +23,8 @@ structure AdmissibleAngularBlindWitness where
   rho : ℝ
   hrho : 0 < rho
   v : Point3
-  mag phi : ScalarField3
+  mag : ScalarField3
+  phi : ScalarField3
   r : ℝ
   hr : 0 < r
   hr_le_rho : r ≤ rho
@@ -31,9 +32,10 @@ structure AdmissibleAngularBlindWitness where
   cancellation : KernelCancellationSpec Kdata
   tail : FarFieldTailControl phi
   signed : SignedCancellationWitness
-    Kdata D ⟨center, rho, hrho⟩ (fun _ => v) mag phi
+    Kdata D ⟨center := center, rho := rho, hrho := hrho⟩
+      (fun _ : Point3 => v) mag phi
   farField_pos :
-    0 < FarFieldSqAvg Kdata D center rho hrho (fun _ => v) mag phi r
+    0 < FarFieldSqAvg Kdata D center rho hrho (fun _ : Point3 => v) mag phi r
 
 /-- Forget the additional analytic contracts and recover the previously checked
 existential angular-blind witness. -/
