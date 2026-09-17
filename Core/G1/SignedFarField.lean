@@ -53,12 +53,12 @@ structure CZKernelSpec (Kdata : StrainKernelData) where
   homogeneous_degree_three : ∀ (a : ℝ), 0 < a → ∀ z : Point3,
     Kdata.kernel (a⁻¹ • z) = a ^ 3 * Kdata.kernel z
   gradKernel : Point3 → Point3
-  grad_is_derivative : ∀ z : Point3, z ≠ 0 → HasFDerivAt Kdata.kernel (ContinuousLinearMap.toSpanSingleton ℝ (gradKernel z)) z
+  grad_is_derivative : ∀ z : Point3, z ≠ 0 →
+    HasFDerivAt Kdata.kernel (innerSL ℝ (gradKernel z)) z
   gradient_decay : ∀ z : Point3, z ≠ 0 → ‖gradKernel z‖ ≤ Cgrad / ‖z‖ ^ 4
 
 /-- Cancellation is imposed on the actual kernel over concrete annuli, not on
-an unrelated auxiliary angular function.  This avoids silently identifying an
-arbitrary `angularKernel` with the physical kernel. -/
+an unrelated auxiliary angular function. -/
 structure KernelCancellationSpec (Kdata : StrainKernelData) where
   annularIntegrable : ∀ a b : ℝ, 0 < a → a < b →
     IntegrableOn Kdata.kernel (Metric.closedBall (0 : Point3) b \ Metric.ball (0 : Point3) a)
@@ -112,15 +112,12 @@ def localBallSqIntegral
     (signedFarFieldAt Kdata D rho hrho xi mag phi x) ^ 2
   else 0
 
-/-- The normalizer is the actual Lebesgue volume of the ball; no caller can
-supply an arbitrary positive scalar. -/
 def FarFieldSqAvg
     (Kdata : StrainKernelData) (D : SignedDirectionContraction)
     (center : Point3) (rho : ℝ) (hrho : 0 < rho)
     (xi : VectorField3) (mag phi : ScalarField3) (r : ℝ) : ℝ :=
   localBallSqIntegral Kdata D center rho hrho xi mag phi r / ballVolume r center
 
-/-- Concrete oscillation functional tied to xi. -/
 def directionalOscillation (xi : VectorField3) (x : Point3) (r : ℝ) : ℝ :=
   ∫ y in Metric.ball x r, ‖xi y - xi x‖
 
@@ -130,8 +127,6 @@ structure DirectionalCoherenceEstimate (xi : VectorField3) where
   bound : ∀ (x : Point3) (r J : ℝ), 0 ≤ r → 0 ≤ J →
     directionalOscillation xi x r ≤ Cdir * r * Real.sqrt J
 
-/-- Shell bookkeeping is tied to a concrete shell contribution function rather
-than an arbitrary stored bound.  The analytic proof must instantiate it. -/
 structure DyadicFarEstimate (shellContribution : ℕ → ℝ) where
   Cdyadic : ℝ
   hCdyadic : 0 ≤ Cdyadic
@@ -158,7 +153,6 @@ theorem SubcutoffScale.ratio_nonneg (s : SubcutoffScale) : 0 ≤ s.ratio := by
 theorem SubcutoffScale.ratio_le_one (s : SubcutoffScale) : s.ratio ≤ 1 := by
   exact (div_le_one s.hrho).2 s.hr_le_rho
 
-/-- Historical p=3 endpoint: target only, never an input theorem. -/
 def SignedCZLinearGainTarget
     (farFieldSqAvg Cfar omegaL2 : ℝ) (s : SubcutoffScale) : Prop :=
   farFieldSqAvg ≤ Cfar * (omegaL2 ^ 2 / s.rho ^ 3) * s.ratio
