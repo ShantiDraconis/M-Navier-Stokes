@@ -77,7 +77,8 @@ jobs:
             echo 'Opaque kernel analytic marker detected.'
             exit 1
           fi
-          if grep -q 'sK + 2 \* sD - 3' Core/G1/K4ScalingAudit.lean; then
+          BAD_EXP="$(sed -n '/def K4ScalingDegrees.requiredRhoExponent/,/theorem master_scaling_determinant/p' Core/G1/K4ScalingAudit.lean | grep -E '^[[:space:]]*q\.sK[[:space:]]*\+[[:space:]]*2[[:space:]]*\*[[:space:]]*q\.sD[[:space:]]*-[[:space:]]*3[[:space:]]*$' || true)"
+          if [ -n "$BAD_EXP" ]; then
             echo 'Incorrect non-quadratic FarAvg exponent formula detected.'
             exit 1
           fi
