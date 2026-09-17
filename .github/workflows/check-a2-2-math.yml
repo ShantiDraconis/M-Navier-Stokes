@@ -43,10 +43,12 @@ jobs:
           if printf '%s\n' "$RAW" | grep -E 'BarrierPreservation|gamma_lt_half|2[[:space:]]*\*[[:space:]]*.*gamma.*C'; then exit 1; fi
       - name: K4 two-fingerprint firewall
         run: |
-          grep -q 'def requiredRhoExponent' Core/G1/K4ScalingAudit.lean
-          grep -q '2 \* sK + 2 \* sD - 3' Core/G1/K4ScalingAudit.lean
+          grep -q 'def K4ScalingDegrees.requiredRhoExponent' Core/G1/K4ScalingAudit.lean
+          grep -q '2 \* q.sK + 2 \* q.sD - 3' Core/G1/K4ScalingAudit.lean
           grep -q 'theorem master_scaling_determinant' Core/G1/K4ScalingAudit.lean
           grep -q 'theorem p3_forces_directional_degree_zero' Core/G1/K4ScalingAudit.lean
+          grep -q 'structure DirectionScalingWitness' Core/G1/K4ScalingAudit.lean
+          grep -q 'theorem contract_degree_zero_of_direction_invariant' Core/G1/K4ScalingAudit.lean
           grep -q 'D.contract (xi x) (xi y)' Core/G1/SignedFarField.lean
           grep -q 'theorem signedFarIntegrand_magnitude_degree_one' Core/G1/SignedFarField.lean
           grep -q 'homogeneous_degree_three' Core/G1/SignedFarField.lean
@@ -56,18 +58,17 @@ jobs:
           grep -q 'def directionalOscillation' Core/G1/SignedFarField.lean
           grep -q 'structure DyadicFarEstimate (shellContribution' Core/G1/SignedFarField.lean
           if grep -q 'D.contract (xi x) (omega y)' Core/G1/SignedFarField.lean; then exit 1; fi
-          # Reject detached analytic declarations, but ignore comments/documentation that
-          # mention historical names. Match only declaration-like source lines.
           if grep -E -q '^[[:space:]]*(def|structure|class|abbrev)[[:space:]]+(angularKernel|PositiveBallVolume)([[:space:]:({]|$)' Core/G1/SignedFarField.lean; then
             echo 'Detached K4 analytic declaration detected.'; exit 1
           fi
           if grep -E -q '^[[:space:]]*(oscillation[[:space:]]*:[[:space:]]*Point3|shellBound[[:space:]]*:)' Core/G1/SignedFarField.lean; then
             echo 'Detached K4 analytic field detected.'; exit 1
           fi
-          # The certified determinant is 2*sK + 2*sD - 3. Reject the obsolete
-          # one-kernel-factor determinant, not the correct theorem body.
-          if grep -E -q '^[[:space:]]*sK[[:space:]]*\+[[:space:]]*2[[:space:]]*\*[[:space:]]*sD[[:space:]]*-[[:space:]]*3[[:space:]]*$' Core/G1/K4ScalingAudit.lean; then
+          if grep -E -q '^[[:space:]]*(q\.)?sK[[:space:]]*\+[[:space:]]*2[[:space:]]*\*[[:space:]]*(q\.)?sD[[:space:]]*-[[:space:]]*3[[:space:]]*$' Core/G1/K4ScalingAudit.lean; then
             echo 'Obsolete one-kernel-factor exponent expression detected.'; exit 1
+          fi
+          if grep -q 'D.contract xi (lambda • omega)' Core/G1/K4ScalingAudit.lean; then
+            echo 'Stale raw-vorticity scaling contract detected.'; exit 1
           fi
       - name: No proof-gap constructs
         run: |
