@@ -21,24 +21,12 @@ jobs:
           lake exe cache get
       - name: Build G1
         run: lake build G1
+      - name: Compile K4 scaling audit
+        run: lake env lean Core/G1/K4ScalingAudit.lean
       - name: Regression A2.1
         run: lake env lean A2/TestA2-1.lean
       - name: Compile A2.2 historical barrier successor
         run: lake env lean A2/TestA2-2.lean
-      - name: Compile K4 scaling audit
-        run: lake env lean Core/G1/K4ScalingAudit.lean
-      - name: K4 scaling firewall
-        run: |
-          grep -q 'def K4ScalingDegrees.requiredRhoExponent' Core/G1/K4ScalingAudit.lean
-          grep -q '2 \* q.sK + 2 \* q.sD - 3' Core/G1/K4ScalingAudit.lean
-          grep -q 'theorem master_scaling_determinant' Core/G1/K4ScalingAudit.lean
-          grep -q 'theorem p3_forces_directional_degree_zero' Core/G1/K4ScalingAudit.lean
-          grep -q 'def ContractDegreeZero' Core/G1/K4ScalingAudit.lean
-          grep -q 'def K4P3ScalingAdmissible' Core/G1/K4ScalingAudit.lean
-          if grep -q 'sK + 2 \*.*sD - 3' Core/G1/K4ScalingAudit.lean; then
-            echo 'Incorrect unsquared-kernel exponent formula detected.'
-            exit 1
-          fi
       - name: Interface firewall
         run: |
           grep -q 'def signedFarFieldIntegral' Core/G1/SignedFarField.lean
@@ -65,6 +53,26 @@ jobs:
             echo 'Barrier/contraction target laundered into raw A2.2 input.'
             exit 1
           fi
+      - name: K4 scaling and directional-contract firewall
+        run: |
+          grep -q 'def requiredRhoExponent' Core/G1/K4ScalingAudit.lean
+          grep -q '2 \* sK + 2 \* sD - 3' Core/G1/K4ScalingAudit.lean
+          grep -q 'theorem master_scaling_determinant' Core/G1/K4ScalingAudit.lean
+          grep -q 'theorem p3_forces_directional_degree_zero' Core/G1/K4ScalingAudit.lean
+          grep -q 'D.contract (xi x) (xi y)' Core/G1/SignedFarField.lean
+          grep -q 'theorem signedFarIntegrand_magnitude_degree_one' Core/G1/SignedFarField.lean
+          if grep -q 'D.contract (xi x) (omega y)' Core/G1/SignedFarField.lean; then
+            echo 'Raw vorticity is still double-counted inside the directional contraction.'
+            exit 1
+          fi
+          if grep -q 'def DirectionalContractDegreeZero' Core/G1/SignedFarField.lean; then
+            echo 'Vacuous degree-zero predicate detected; audit magnitude scaling instead.'
+            exit 1
+          fi
+          if grep -q 'sK + 2 \* sD - 3' Core/G1/K4ScalingAudit.lean; then
+            echo 'Incorrect non-quadratic FarAvg exponent formula detected.'
+            exit 1
+          fi
       - name: No proof-gap constructs
         run: |
           if grep -R -n -E '\bsorry\b|\badmit\b|^[[:space:]]*axiom[[:space:]]' Core A2 --include='*.lean'; then
@@ -83,8 +91,10 @@ jobs:
           echo "CERT_SHA=$GITHUB_SHA"
           echo 'MECHANICAL_STATUS=TESTING'
           echo 'SCIENTIFIC_STATUS=OPEN_BRIDGE'
+          echo 'NODE_K4_SCALING=PROVED_LEAN_CANDIDATE'
+          echo 'NODE_K4_DIRECTIONAL_MODEL=PROVED_LEAN_CANDIDATE'
+          echo 'NODE_K4_SIGNED_CANCELLATION=OPEN_BRIDGE'
+          echo 'NODE_K4_LINEAR_GAIN=OPEN_BRIDGE'
           echo 'NODE_CAMPANATO_ONE_STEP=OPEN_BRIDGE'
           echo 'NODE_BARRIER_PRESERVATION=OPEN_BRIDGE'
           echo 'NODE_DYADIC_BARRIER_ALGEBRA=PROVED_LEAN_CANDIDATE'
-          echo 'NODE_K4_SCALING_ALGEBRA=PROVED_LEAN_CANDIDATE'
-          echo 'NODE_K4_CONTRACT_DEGREE_ZERO=OPEN_BRIDGE'
