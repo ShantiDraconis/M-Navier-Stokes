@@ -78,9 +78,8 @@ theorem contract_degree_zero_of_direction_invariant
     (D : SignedDirectionContraction) (xi scaledXi : VectorField3)
     (hscale : DirectionScalingWitness xi scaledXi) :
     ContractDegreeZeroAt D xi scaledXi := by
-  subst scaledXi
   intro x y
-  rfl
+  rw [hscale.invariant]
 
 /-- K4 p=3 scaling admissibility is now tied to an explicit physical scaling
 witness rather than an unsupported rescaling of a direction argument. -/
