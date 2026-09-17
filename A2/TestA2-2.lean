@@ -51,7 +51,6 @@ structure A2SignedFarFieldInput where
   D : SignedDirectionContraction
   geom : FarFieldGeometry
   xi : VectorField3
-  omega : VectorField3
   mag : ScalarField3
   phi : ScalarField3
 
@@ -70,7 +69,7 @@ structure CampanatoFromWeightedInputs where
   hC_pos : 0 < C
   signedCancellation :
     |signedFarFieldIntegral signedFar.Kdata signedFar.D signedFar.geom
-        signedFar.xi signedFar.omega signedFar.mag signedFar.phi| ≤
+        signedFar.xi signedFar.mag signedFar.phi| ≤
       cancellationData.gamma * cancellationData.nu * cancellationData.diffusionBulk +
       cancellationData.Ckappa * cancellationData.gradUSq * profile.J scaling.r +
       cancellationData.remainder
