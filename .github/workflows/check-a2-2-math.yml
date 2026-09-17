@@ -2,7 +2,7 @@ name: check-a2-2-math
 
 on:
   push:
-    branches: [next/a2-2-math]
+    branches: [next/a2-2-math, next/a2-2-budget]
     paths: ['A2/**','Core/**','audit/**','scripts/**','.github/workflows/check-a2-2-math.yml','lakefile.lean','lean-toolchain']
   workflow_dispatch:
 
@@ -23,7 +23,7 @@ jobs:
         run: lake build G1
       - name: Regression A2.1
         run: lake env lean A2/TestA2-1.lean
-      - name: Compile retyped A2.2 and print provenance bodies
+      - name: Compile A2.2 historical barrier successor
         run: lake env lean A2/TestA2-2.lean
       - name: Interface firewall
         run: |
@@ -38,13 +38,21 @@ jobs:
             exit 1
           fi
           grep -q 'profile.J scaling.r' A2/TestA2-2.lean
-      - name: Target-as-input firewall
+      - name: Historical barrier specification firewall
         run: |
-          RAW="$(sed -n '/structure A2SignedCancellationData where/,/structure A2RhoScalingData where/p' A2/TestA2-2.lean)"
-          if printf '%s\n' "$RAW" | grep -E 'hgamma_half[[:space:]]*:|gamma_lt_half[[:space:]]*:|SubcriticalBudget'; then
-            echo 'Contraction target/budget found in raw cancellation data.'
+          grep -q 'def BarrierPreservation' Core/G1/DynamicCampanato.lean
+          grep -q '2 \* gamma \* C + 2 \* A ≤ C' Core/G1/DynamicCampanato.lean
+          if grep -R -n 'def SubcriticalBudget' Core A2 --include='*.lean'; then
+            echo 'Obsolete provisional SubcriticalBudget remains active.'
             exit 1
           fi
+          RAW="$(sed -n '/structure CampanatoFromWeightedInputs where/,/def CampanatoOneStep/p' A2/TestA2-2.lean)"
+          if printf '%s\n' "$RAW" | grep -E 'BarrierPreservation|gamma_lt_half|2[[:space:]]*\*[[:space:]]*.*gamma.*C'; then
+            echo 'Barrier/contraction target laundered into raw A2.2 input.'
+            exit 1
+          fi
+      - name: No proof-gap constructs
+        run: |
           if grep -R -n -E '\bsorry\b|\badmit\b|^[[:space:]]*axiom[[:space:]]' Core A2 --include='*.lean'; then
             echo 'Forbidden proof-gap construct.'
             exit 1
@@ -54,10 +62,13 @@ jobs:
       - name: Scientific boundary check
         run: |
           grep -q 'def CampanatoOneStep' A2/TestA2-2.lean
-          grep -q 'def SubcriticalBudget' Core/G1/DynamicCampanato.lean
-          grep -q 'gamma_lt_half : I.cancellationData.gamma' A2/TestA2-2.lean
+          grep -q 'def BarrierPreservation' Core/G1/DynamicCampanato.lean
+          grep -q 'theorem coefficient_half_of_barrier' Core/G1/DynamicCampanato.lean
+          grep -q 'theorem gamma_lt_half_of_barrier' Core/G1/DynamicCampanato.lean
+          grep -q 'theorem contraction_from_barrier_preservation' A2/TestA2-2.lean
           echo "CERT_SHA=$GITHUB_SHA"
           echo 'MECHANICAL_STATUS=TESTING'
           echo 'SCIENTIFIC_STATUS=OPEN_BRIDGE'
           echo 'NODE_CAMPANATO_ONE_STEP=OPEN_BRIDGE'
-          echo 'NODE_SUBCRITICAL_BUDGET=OPEN_BRIDGE'
+          echo 'NODE_BARRIER_PRESERVATION=OPEN_BRIDGE'
+          echo 'NODE_DYADIC_BARRIER_ALGEBRA=PROVED_LEAN_CANDIDATE'
