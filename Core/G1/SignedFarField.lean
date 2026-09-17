@@ -76,7 +76,6 @@ structure CZKernelSpec (Kdata : StrainKernelData) : Prop where
   gradient_decay : ∀ z : Point3, z ≠ 0 →
     ‖gradKernel z‖ ≤ Cgrad / ‖z‖ ^ 4
 
-/-- Typed cancellation datum for a concrete angular representation. -/
 structure KernelCancellationSpec (Kdata : StrainKernelData) : Prop where
   angularKernel : Point3 → ℝ
   angularIntegrable : Integrable angularKernel
@@ -133,13 +132,7 @@ theorem signedFarIntegrand_magnitude_degree_one
   simp [signedFarIntegrand]
   ring
 
-/-! ## Exact far-field square-average semantics
-
-The center dependence is represented explicitly by rebuilding the geometry at
-`x`.  `FarFieldSqAvg` is an actual integral over the local ball indicator,
-normalized by a supplied positive ball volume.  This is intentionally not an
-abstract scalar `farFieldSqAvg` input.
--/
+/-! ## Exact far-field square-average semantics -/
 
 def signedFarFieldAt
     (Kdata : StrainKernelData)
@@ -178,6 +171,34 @@ def FarFieldSqAvg
     (ballVolume : PositiveBallVolume) : ℝ :=
   localBallSqIntegral Kdata D center rho hrho xi mag phi r /
     ballVolume.volume
+
+/-! ## K4.4--K4.7 proof obligations, represented without target laundering -/
+
+/-- Quantitative directional oscillation contract to be derived from the
+Campanato control.  It does not contain the final far-field target. -/
+structure DirectionalCoherenceEstimate
+    (xi : VectorField3) : Prop where
+  Cdir : ℝ
+  hCdir : 0 ≤ Cdir
+  oscillation : Point3 → ℝ → ℝ
+  bound : ∀ (x : Point3) (r J : ℝ), 0 ≤ r → 0 ≤ J →
+    oscillation x r ≤ Cdir * r * Real.sqrt J
+
+/-- Finite dyadic-shell bookkeeping.  The shell estimate itself is supplied by
+an upstream analytic proof; the final linear-gain target is absent. -/
+structure DyadicFarEstimate : Prop where
+  Cdyadic : ℝ
+  hCdyadic : 0 ≤ Cdyadic
+  shellBound : ℕ → ℝ
+  hshell_nonneg : ∀ j, 0 ≤ shellBound j
+  shellSummable : Summable shellBound
+  total_bound : ∑' j, shellBound j ≤ Cdyadic
+
+/-- Uniformity firewall: `Cfar` is chosen once, before the local scale `r`.
+This structure deliberately contains no proof of the endpoint itself. -/
+structure UniformFarConstant : Prop where
+  Cfar : ℝ
+  hCfar : 0 ≤ Cfar
 
 /-! ## Sub-cutoff scale and endpoint -/
 
