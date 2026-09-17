@@ -1,18 +1,10 @@
 /-
-A2.2 reconstruction: signed far-field vocabulary.
+A2.2 signed far-field analytic interface.
 
-Provenance:
-  origin: reconstructed
-  date: 2026-09-17
-  branch: next/a2-2
-  historical search: no implementation of G1.SignedFarField was recovered
-  from the accessible ShantiDraconis GitHub corpus before this reconstruction.
-
-Audit boundary:
-  This module introduces only types and a transparent definition. It proves no
-  cancellation estimate, no Campanato recurrence, and no Navier--Stokes
-  regularity statement. In particular, no analytic bridge is stored as a
-  structure field.
+This successor replaces the earlier pointwise reconstruction scaffold.  The
+far contribution is now an actual integral over the region outside rho.  No
+cancellation estimate, integrability claim, Campanato recurrence, or
+Navier--Stokes regularity theorem is assumed here.
 -/
 import Mathlib
 
@@ -23,32 +15,45 @@ namespace G1Audit
 abbrev VectorField3 := EuclideanSpace ℝ (Fin 3) → EuclideanSpace ℝ (Fin 3)
 abbrev ScalarField3 := EuclideanSpace ℝ (Fin 3) → ℝ
 
-/-- Kernel data kept explicit so later analytic estimates cannot hide constants. -/
 structure StrainKernelData where
   kernel : EuclideanSpace ℝ (Fin 3) → ℝ
 
-/-- Signed direction contraction used by the far-field integrand. -/
 structure SignedDirectionContraction where
   contract : EuclideanSpace ℝ (Fin 3) → EuclideanSpace ℝ (Fin 3) → ℝ
 
-/-- Geometric parameters of the near/far split. -/
 structure FarFieldGeometry where
   center : EuclideanSpace ℝ (Fin 3)
   rho : ℝ
   hrho : 0 < rho
 
-/--
-Transparent pointwise signed far-field model.  Integration and the analytic
-estimate are deliberately not encoded here; those are separate A2.2 burdens.
--/
-def signedFarField
+/-- Signed bilinear integrand at center x against source point y. -/
+def signedFarIntegrand
+    (Kdata : StrainKernelData)
+    (D : SignedDirectionContraction)
+    (x y : EuclideanSpace ℝ (Fin 3))
+    (xi omega : VectorField3)
+    (mag phi : ScalarField3) : ℝ :=
+  Kdata.kernel (x - y) * D.contract (xi x) (omega y) * mag y * phi y
+
+/-- Far-region indicator.  The cutoff radius is explicit in the definition. -/
+def farRegionIntegrand
+    (Kdata : StrainKernelData)
+    (D : SignedDirectionContraction)
+    (geom : FarFieldGeometry)
+    (xi omega : VectorField3)
+    (mag phi : ScalarField3)
+    (y : EuclideanSpace ℝ (Fin 3)) : ℝ :=
+  if geom.rho ≤ ‖y - geom.center‖ then
+    signedFarIntegrand Kdata D geom.center y xi omega mag phi
+  else 0
+
+/-- Actual signed far-field integral used by the A2.2 interface. -/
+def signedFarFieldIntegral
     (Kdata : StrainKernelData)
     (D : SignedDirectionContraction)
     (geom : FarFieldGeometry)
     (xi omega : VectorField3)
     (mag phi : ScalarField3) : ℝ :=
-  Kdata.kernel geom.center *
-    D.contract (xi geom.center) (omega geom.center) *
-    mag geom.center * phi geom.center
+  ∫ y, farRegionIntegrand Kdata D geom xi omega mag phi y
 
 end G1Audit
