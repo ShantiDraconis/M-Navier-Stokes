@@ -1,37 +1,33 @@
 /-
-A2.2 successor harness: laundering-free mathematical boundary.
+A2.2 successor harness after fixing the signed far-field integral interface.
 
-Scientific boundary: the missing analytic Campanato recurrence and the strict
-subcritical budget are conclusions to be independently established, not raw
-inputs hidden in data structures.
+Predecessor frozen boundary:
+  82799845504653252e2a688ffd917aa9822485e1
+
+Scientific boundary: CampanatoOneStep and SubcriticalBudget remain separate
+open obligations.  Neither is stored in raw input data.
 -/
 import G1.WeakDiffusionIBP
 import G1.SignedFarField
 import G1.DynamicCampanato
 
 noncomputable section
-
 namespace G1Audit
 
 def A2WeightedIBPResult (d : WeightedDualityComponent) : Prop :=
   d.lapPair = -d.bulk - d.cutoffCross - d.weightCross
 
-structure A2SignedCancellationInputs where
-  farValue : ℝ
+structure A2SignedCancellationData where
   nu : ℝ
   diffusionBulk : ℝ
   Ckappa : ℝ
   gradUSq : ℝ
-  Jr : ℝ
   remainder : ℝ
   gamma : ℝ
   hnu : 0 < nu
   hgamma_nonneg : 0 ≤ gamma
   hdiff_nonneg : 0 ≤ diffusionBulk
   hgrad_nonneg : 0 ≤ gradUSq
-  hJ_nonneg : 0 ≤ Jr
-  cancellation :
-    |farValue| ≤ gamma * nu * diffusionBulk + Ckappa * gradUSq * Jr + remainder
 
 structure A2RhoScalingData where
   rho : ℝ
@@ -59,7 +55,7 @@ structure A2SignedFarFieldInput where
   mag : ScalarField3
   phi : ScalarField3
   value : ℝ
-  hvalue : value = signedFarField Kdata D geom xi omega mag phi
+  hvalue : value = signedFarFieldIntegral Kdata D geom xi omega mag phi
 
 structure CampanatoProfile where
   J : ℝ → ℝ
@@ -69,34 +65,46 @@ structure CampanatoFromWeightedInputs where
   duality : WeightedDualityComponent
   weightedIBP : A2WeightedIBPResult duality
   signedFar : A2SignedFarFieldInput
-  cancellation : A2SignedCancellationInputs
+  cancellationData : A2SignedCancellationData
   scaling : A2RhoScalingData
   profile : CampanatoProfile
   C : ℝ
   hC_nonneg : 0 ≤ C
+  signedCancellation :
+    |signedFar.value| ≤
+      cancellationData.gamma * cancellationData.nu * cancellationData.diffusionBulk +
+      cancellationData.Ckappa * cancellationData.gradUSq * profile.J scaling.r +
+      cancellationData.remainder
 
 def CampanatoOneStep (I : CampanatoFromWeightedInputs) : Prop :=
   I.profile.J (I.scaling.r / 2) ≤
-    I.cancellation.gamma * I.profile.J I.scaling.r +
+    I.cancellationData.gamma * I.profile.J I.scaling.r +
       I.scaling.A * I.scaling.ratio
 
-/-- Result object: both fields must be derived; neither is raw input data. -/
 structure A2DerivedContraction (I : CampanatoFromWeightedInputs) where
   oneStep : CampanatoOneStep I
-  gamma_lt_half : I.cancellation.gamma < (1 : ℝ) / 2
+  gamma_lt_half : I.cancellationData.gamma < (1 : ℝ) / 2
 
-/-- Strict contraction requires a separately established subcritical budget. -/
+/-- Conditional algebra only: this does not establish SubcriticalBudget. -/
 theorem contraction_from_independent_budget
     (I : CampanatoFromWeightedInputs)
-    (hclosure : LinearClosure I.cancellation.gamma I.scaling.A I.C)
-    (hbudget : SubcriticalBudget I.cancellation.gamma I.scaling.A I.C) :
-    I.cancellation.gamma < (1 : ℝ) / 2 := by
+    (hclosure : LinearClosure I.cancellationData.gamma I.scaling.A I.C)
+    (hbudget : SubcriticalBudget I.cancellationData.gamma I.scaling.A I.C) :
+    I.cancellationData.gamma < (1 : ℝ) / 2 := by
   exact gamma_lt_half_of_subcriticalBudget hclosure hbudget
 
+/-- Reproved after the pointwise scaffold was replaced by the integral object. -/
 theorem testA2_2_signedFarField_visible (I : CampanatoFromWeightedInputs) :
     I.signedFar.value =
-      signedFarField I.signedFar.Kdata I.signedFar.D I.signedFar.geom
+      signedFarFieldIntegral I.signedFar.Kdata I.signedFar.D I.signedFar.geom
         I.signedFar.xi I.signedFar.omega I.signedFar.mag I.signedFar.phi := by
   exact I.signedFar.hvalue
+
+#print A2RhoScalingData.ratio
+#print CampanatoOneStep
+#print LinearClosure
+#print SubcriticalBudget
+#print gamma_lt_half_of_subcriticalBudget
+#print contraction_from_independent_budget
 
 end G1Audit
