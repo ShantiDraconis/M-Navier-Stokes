@@ -3,7 +3,7 @@ name: check-a2-2-math
 on:
   push:
     branches: [next/a2-2-math]
-    paths: ['A2/**','Core/**','.github/workflows/check-a2-2-math.yml','lakefile.lean','lean-toolchain']
+    paths: ['A2/**','Core/**','audit/**','scripts/**','.github/workflows/check-a2-2-math.yml','lakefile.lean','lean-toolchain']
   workflow_dispatch:
 
 jobs:
@@ -23,23 +23,41 @@ jobs:
         run: lake build G1
       - name: Regression A2.1
         run: lake env lean A2/TestA2-1.lean
-      - name: Compile laundering-free A2.2
+      - name: Compile retyped A2.2 and print provenance bodies
         run: lake env lean A2/TestA2-2.lean
+      - name: Interface firewall
+        run: |
+          grep -q 'def signedFarFieldIntegral' Core/G1/SignedFarField.lean
+          grep -q '∫ y, farRegionIntegrand' Core/G1/SignedFarField.lean
+          if grep -R -n 'signedFarField ' Core A2 --include='*.lean'; then
+            echo 'Legacy pointwise signedFarField remains in active chain.'
+            exit 1
+          fi
+          if grep -n -E '^[[:space:]]*Jr[[:space:]]*:' A2/TestA2-2.lean; then
+            echo 'Detached scalar Jr remains in A2.2.'
+            exit 1
+          fi
+          grep -q 'profile.J scaling.r' A2/TestA2-2.lean
       - name: Target-as-input firewall
         run: |
-          INPUT_BLOCK="$(sed -n '/structure A2SignedCancellationInputs where/,/structure A2RhoScalingData where/p' A2/TestA2-2.lean)"
-          if printf '%s\n' "$INPUT_BLOCK" | grep -E 'hgamma_half[[:space:]]*:|gamma_lt_half[[:space:]]*:'; then
-            echo 'Target property found in raw A2.2 input structure.'
+          RAW="$(sed -n '/structure A2SignedCancellationData where/,/structure A2RhoScalingData where/p' A2/TestA2-2.lean)"
+          if printf '%s\n' "$RAW" | grep -E 'hgamma_half[[:space:]]*:|gamma_lt_half[[:space:]]*:|SubcriticalBudget'; then
+            echo 'Contraction target/budget found in raw cancellation data.'
             exit 1
           fi
           if grep -R -n -E '\bsorry\b|\badmit\b|^[[:space:]]*axiom[[:space:]]' Core A2 --include='*.lean'; then
             echo 'Forbidden proof-gap construct.'
             exit 1
           fi
-      - name: Derived-result boundary check
+      - name: Static laundering tripwire
+        run: python3 scripts/check_assumption_laundering.py
+      - name: Scientific boundary check
         run: |
           grep -q 'def CampanatoOneStep' A2/TestA2-2.lean
-          grep -q 'structure A2DerivedContraction' A2/TestA2-2.lean
-          grep -q 'gamma_lt_half : I.cancellation.gamma' A2/TestA2-2.lean
+          grep -q 'def SubcriticalBudget' Core/G1/DynamicCampanato.lean
+          grep -q 'gamma_lt_half : I.cancellationData.gamma' A2/TestA2-2.lean
           echo "CERT_SHA=$GITHUB_SHA"
+          echo 'MECHANICAL_STATUS=TESTING'
           echo 'SCIENTIFIC_STATUS=OPEN_BRIDGE'
+          echo 'NODE_CAMPANATO_ONE_STEP=OPEN_BRIDGE'
+          echo 'NODE_SUBCRITICAL_BUDGET=OPEN_BRIDGE'
