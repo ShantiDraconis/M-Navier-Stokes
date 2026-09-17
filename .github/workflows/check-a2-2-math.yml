@@ -31,29 +31,17 @@ jobs:
         run: |
           grep -q 'def signedFarFieldIntegral' Core/G1/SignedFarField.lean
           grep -q '∫ y, farRegionIntegrand' Core/G1/SignedFarField.lean
-          if grep -R -n 'signedFarField ' Core A2 --include='*.lean'; then
-            echo 'Legacy pointwise signedFarField remains in active chain.'
-            exit 1
-          fi
-          if grep -n -E '^[[:space:]]*Jr[[:space:]]*:' A2/TestA2-2.lean; then
-            echo 'Detached scalar Jr remains in A2.2.'
-            exit 1
-          fi
+          if grep -R -n 'signedFarField ' Core A2 --include='*.lean'; then exit 1; fi
+          if grep -n -E '^[[:space:]]*Jr[[:space:]]*:' A2/TestA2-2.lean; then exit 1; fi
           grep -q 'profile.J scaling.r' A2/TestA2-2.lean
       - name: Historical barrier specification firewall
         run: |
           grep -q 'def BarrierPreservation' Core/G1/DynamicCampanato.lean
           grep -q '2 \* gamma \* C + 2 \* A ≤ C' Core/G1/DynamicCampanato.lean
-          if grep -R -n 'def SubcriticalBudget' Core A2 --include='*.lean'; then
-            echo 'Obsolete provisional SubcriticalBudget remains active.'
-            exit 1
-          fi
+          if grep -R -n 'def SubcriticalBudget' Core A2 --include='*.lean'; then exit 1; fi
           RAW="$(sed -n '/structure CampanatoFromWeightedInputs where/,/def CampanatoOneStep/p' A2/TestA2-2.lean)"
-          if printf '%s\n' "$RAW" | grep -E 'BarrierPreservation|gamma_lt_half|2[[:space:]]*\*[[:space:]]*.*gamma.*C'; then
-            echo 'Barrier/contraction target laundered into raw A2.2 input.'
-            exit 1
-          fi
-      - name: K4 scaling and directional-contract firewall
+          if printf '%s\n' "$RAW" | grep -E 'BarrierPreservation|gamma_lt_half|2[[:space:]]*\*[[:space:]]*.*gamma.*C'; then exit 1; fi
+      - name: K4 two-fingerprint firewall
         run: |
           grep -q 'def requiredRhoExponent' Core/G1/K4ScalingAudit.lean
           grep -q '2 \* sK + 2 \* sD - 3' Core/G1/K4ScalingAudit.lean
@@ -62,32 +50,21 @@ jobs:
           grep -q 'D.contract (xi x) (xi y)' Core/G1/SignedFarField.lean
           grep -q 'theorem signedFarIntegrand_magnitude_degree_one' Core/G1/SignedFarField.lean
           grep -q 'homogeneous_degree_three' Core/G1/SignedFarField.lean
-          grep -q 'gradient_decay : ∀' Core/G1/SignedFarField.lean
-          grep -q 'structure KernelCancellationSpec' Core/G1/SignedFarField.lean
-          grep -q 'mean_zero : ∫ theta, angularKernel theta = 0' Core/G1/SignedFarField.lean
-          grep -q 'def FarFieldSqAvg' Core/G1/SignedFarField.lean
-          grep -q 'structure DirectionalCoherenceEstimate' Core/G1/SignedFarField.lean
-          grep -q 'structure DyadicFarEstimate' Core/G1/SignedFarField.lean
-          grep -q 'structure UniformFarConstant' Core/G1/SignedFarField.lean
-          if grep -q 'D.contract (xi x) (omega y)' Core/G1/SignedFarField.lean; then
-            echo 'Raw vorticity is still double-counted inside the directional contraction.'
-            exit 1
+          grep -q 'grad_is_derivative' Core/G1/SignedFarField.lean
+          grep -q 'annular_mean_zero' Core/G1/SignedFarField.lean
+          grep -q 'ballVolume r center' Core/G1/SignedFarField.lean
+          grep -q 'def directionalOscillation' Core/G1/SignedFarField.lean
+          grep -q 'structure DyadicFarEstimate (shellContribution' Core/G1/SignedFarField.lean
+          if grep -q 'D.contract (xi x) (omega y)' Core/G1/SignedFarField.lean; then exit 1; fi
+          if grep -q 'angularKernel\|PositiveBallVolume\|oscillation : Point3\|shellBound :' Core/G1/SignedFarField.lean; then
+            echo 'Detached K4 analytic data detected.'; exit 1
           fi
-          if grep -q 'gradient_decay : Prop\|annular_mean_zero : Prop' Core/G1/SignedFarField.lean; then
-            echo 'Opaque kernel analytic marker detected.'
-            exit 1
-          fi
-          BAD_EXP="$(sed -n '/def K4ScalingDegrees.requiredRhoExponent/,/theorem master_scaling_determinant/p' Core/G1/K4ScalingAudit.lean | grep -E '^[[:space:]]*q\.sK[[:space:]]*\+[[:space:]]*2[[:space:]]*\*[[:space:]]*q\.sD[[:space:]]*-[[:space:]]*3[[:space:]]*$' || true)"
-          if [ -n "$BAD_EXP" ]; then
-            echo 'Incorrect non-quadratic FarAvg exponent formula detected.'
-            exit 1
+          if grep -E -q '^[[:space:]]*2 \* sK \+ 2 \* sD - 3[[:space:]]*$' Core/G1/K4ScalingAudit.lean; then
+            echo 'Obsolete standalone exponent expression detected.'; exit 1
           fi
       - name: No proof-gap constructs
         run: |
-          if grep -R -n -E '\bsorry\b|\badmit\b|^[[:space:]]*axiom[[:space:]]' Core A2 --include='*.lean'; then
-            echo 'Forbidden proof-gap construct.'
-            exit 1
-          fi
+          if grep -R -n -E '\bsorry\b|\badmit\b|^[[:space:]]*axiom[[:space:]]' Core A2 --include='*.lean'; then exit 1; fi
       - name: Static laundering tripwire
         run: python3 scripts/check_assumption_laundering.py
       - name: Scientific boundary check
@@ -100,15 +77,9 @@ jobs:
           echo "CERT_SHA=$GITHUB_SHA"
           echo 'MECHANICAL_STATUS=TESTING'
           echo 'SCIENTIFIC_STATUS=OPEN_BRIDGE'
+          echo 'FP_K4_A=TYPED_OPEN_BRIDGE'
+          echo 'FP_K4_B=TYPED_OPEN_BRIDGE'
           echo 'NODE_K4_SCALING=PROVED_LEAN_CANDIDATE'
-          echo 'NODE_K4_DIRECTIONAL_MODEL=PROVED_LEAN_CANDIDATE'
-          echo 'NODE_K4_KERNEL_ANALYTIC_CONTRACTS=TYPED_OPEN_BRIDGE'
-          echo 'NODE_K4_FAR_AVERAGE=DEFINED'
-          echo 'NODE_K4_COHERENCE=TYPED_OPEN_BRIDGE'
-          echo 'NODE_K4_DYADIC=TYPED_OPEN_BRIDGE'
-          echo 'NODE_K4_UNIFORM_CONSTANT=TYPED_OPEN_BRIDGE'
           echo 'NODE_K4_SIGNED_CANCELLATION=OPEN_BRIDGE'
           echo 'NODE_K4_LINEAR_GAIN=OPEN_BRIDGE'
-          echo 'NODE_CAMPANATO_ONE_STEP=OPEN_BRIDGE'
-          echo 'NODE_BARRIER_PRESERVATION=OPEN_BRIDGE'
           echo 'NODE_DYADIC_BARRIER_ALGEBRA=PROVED_LEAN_CANDIDATE'
