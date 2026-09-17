@@ -1,0 +1,80 @@
+name: check-a2-2
+
+on:
+  push:
+    branches:
+      - next/a2-2
+    paths:
+      - 'A2/**'
+      - 'Core/**'
+      - 'workbench/**'
+      - 'lakefile.lean'
+      - 'lake-manifest.json'
+      - 'lean-toolchain'
+      - '.github/workflows/check-a2-2.yml'
+  pull_request:
+    paths:
+      - 'A2/**'
+      - 'Core/**'
+      - 'lakefile.lean'
+      - 'lake-manifest.json'
+      - 'lean-toolchain'
+      - '.github/workflows/check-a2-2.yml'
+  workflow_dispatch:
+
+jobs:
+  check-a2-2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Lean 4.32.1
+        run: |
+          curl https://elan.lean-lang.org/elan-init.sh -sSf | sh -s -- -y --default-toolchain leanprover/lean4:v4.32.1
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Record environment
+        run: |
+          lean --version
+          lake --version
+          git rev-parse HEAD
+          cat lean-toolchain
+          cat lakefile.lean
+
+      - name: Generate Lake manifest
+        run: |
+          lake update
+          test -s lake-manifest.json
+          sha256sum lake-manifest.json
+
+      - name: Fetch Mathlib cache
+        run: lake exe cache get
+
+      - name: Compile G1 library
+        run: lake build G1
+
+      - name: Compile A2.1 regression baseline
+        run: lake env lean A2/TestA2-1.lean
+
+      - name: Compile A2.2 harness
+        run: lake env lean A2/TestA2-2.lean
+
+      - name: Audit forbidden proof gaps
+        run: |
+          if grep -R -n -E '\bsorry\b|\badmit\b|^[[:space:]]*axiom[[:space:]]' Core A2 --include='*.lean'; then
+            echo 'Forbidden proof-gap construct found in certifiable DAG.'
+            exit 1
+          fi
+
+      - name: Audit reconstructed bridge boundary
+        run: |
+          ! grep -n -E 'recurrence[[:space:]]*:' Core/G1/SignedFarField.lean Core/G1/DynamicCampanato.lean
+          ! grep -n -E 'cancellation[[:space:]]*:' Core/G1/SignedFarField.lean Core/G1/DynamicCampanato.lean
+
+      - name: Certificate summary
+        run: |
+          echo "CERT_SHA=$GITHUB_SHA"
+          echo "LEAN=$(lean --version | head -1)"
+          echo "LAKE=$(lake --version | head -1)"
+          echo "MANIFEST_SHA256=$(sha256sum lake-manifest.json | cut -d' ' -f1)"
+          echo 'A2_2_RECONSTRUCTION_GATE=EXECUTED'
