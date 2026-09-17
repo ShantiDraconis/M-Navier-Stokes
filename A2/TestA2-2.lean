@@ -1,11 +1,11 @@
 /-
-A2.2 successor harness after fixing the signed far-field integral interface.
+A2.2 successor harness with the recovered historical dyadic barrier condition.
 
-Predecessor frozen boundary:
-  82799845504653252e2a688ffd917aa9822485e1
+Mechanical predecessor frozen at:
+  7c6e4f0e00275225aed9a1c16ff63c0a98e8b1e6
 
-Scientific boundary: CampanatoOneStep and SubcriticalBudget remain separate
-open obligations. Neither is stored in raw input data.
+Scientific boundary: CampanatoOneStep and BarrierPreservation remain separate
+open analytic obligations. Neither is stored as a raw conclusion field.
 -/
 import G1.WeakDiffusionIBP
 import G1.SignedFarField
@@ -67,7 +67,7 @@ structure CampanatoFromWeightedInputs where
   scaling : A2RhoScalingData
   profile : CampanatoProfile
   C : ℝ
-  hC_nonneg : 0 ≤ C
+  hC_pos : 0 < C
   signedCancellation :
     |signedFarFieldIntegral signedFar.Kdata signedFar.D signedFar.geom
         signedFar.xi signedFar.omega signedFar.mag signedFar.phi| ≤
@@ -84,13 +84,14 @@ structure A2DerivedContraction (I : CampanatoFromWeightedInputs) where
   oneStep : CampanatoOneStep I
   gamma_lt_half : I.cancellationData.gamma < (1 : ℝ) / 2
 
-/-- Conditional algebra only: this does not establish SubcriticalBudget. -/
-theorem contraction_from_independent_budget
+/-- Conditional algebra only. BarrierPreservation must be derived independently
+    from the analytic estimates; it is not stored in CampanatoFromWeightedInputs. -/
+theorem contraction_from_barrier_preservation
     (I : CampanatoFromWeightedInputs)
-    (hclosure : LinearClosure I.cancellationData.gamma I.scaling.A I.C)
-    (hbudget : SubcriticalBudget I.cancellationData.gamma I.scaling.A I.C) :
+    (hApos : 0 < I.scaling.A)
+    (hbudget : BarrierPreservation I.cancellationData.gamma I.scaling.A I.C) :
     I.cancellationData.gamma < (1 : ℝ) / 2 := by
-  exact gamma_lt_half_of_subcriticalBudget hclosure hbudget
+  exact gamma_lt_half_of_barrier I.hC_pos hApos hbudget
 
 #print A2RhoScalingData.ratio
 #print signedFarIntegrand
@@ -98,8 +99,9 @@ theorem contraction_from_independent_budget
 #print signedFarFieldIntegral
 #print CampanatoOneStep
 #print LinearClosure
-#print SubcriticalBudget
-#print gamma_lt_half_of_subcriticalBudget
-#print contraction_from_independent_budget
+#print BarrierPreservation
+#print coefficient_half_of_barrier
+#print gamma_lt_half_of_barrier
+#print contraction_from_barrier_preservation
 
 end G1Audit
