@@ -10,4 +10,5 @@ import G1.XiEpsPDE
 import G1.XiEpsLocalizedRealization
 import G1.WeakDiffusionIBP
 import G1.SignedFarField
+import G1.K4ScalingAudit
 import G1.DynamicCampanato
