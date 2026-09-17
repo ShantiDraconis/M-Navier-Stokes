@@ -42,15 +42,10 @@ theorem gamma_lt_half_of_barrier
     (hbudget : BarrierPreservation gamma A C) :
     gamma < (1 : ℝ) / 2 := by
   unfold BarrierPreservation at hbudget
-  have hstrict : 2 * gamma * C < C := by
-    linarith
-  have hmul : gamma * (2 * C) < C := by
+  by_contra h
+  have hgamma : (1 : ℝ) / 2 ≤ gamma := le_of_not_gt h
+  have hmul : C ≤ 2 * gamma * C := by
     nlinarith
-  have h2C : 0 < 2 * C := by positivity
-  have hgamma : gamma < C / (2 * C) :=
-    (lt_div_iff h2C).2 hmul
-  have hfrac : C / (2 * C) = (1 : ℝ) / 2 := by
-    field_simp [hC.ne']
-  simpa [hfrac] using hgamma
+  linarith
 
 end G1Audit
