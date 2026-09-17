@@ -5,6 +5,8 @@ already used by the K4 target at predecessor b99786a701fd08dd247d1ef3d7f6e63796b
 -/
 import G1.SignedFarField
 
+noncomputable section
+
 namespace G1Audit
 
 /-- The current K4 directional observable is physical-space local oscillation.
@@ -33,3 +35,5 @@ structure K4XiSemanticInput where
 #print axioms SignedCZLinearGainTarget
 
 end G1Audit
+
+end
