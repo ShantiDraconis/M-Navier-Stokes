@@ -56,11 +56,18 @@ jobs:
           grep -q 'def directionalOscillation' Core/G1/SignedFarField.lean
           grep -q 'structure DyadicFarEstimate (shellContribution' Core/G1/SignedFarField.lean
           if grep -q 'D.contract (xi x) (omega y)' Core/G1/SignedFarField.lean; then exit 1; fi
-          if grep -q 'angularKernel\|PositiveBallVolume\|oscillation : Point3\|shellBound :' Core/G1/SignedFarField.lean; then
-            echo 'Detached K4 analytic data detected.'; exit 1
+          # Reject detached analytic declarations, but ignore comments/documentation that
+          # mention historical names. Match only declaration-like source lines.
+          if grep -E -q '^[[:space:]]*(def|structure|class|abbrev)[[:space:]]+(angularKernel|PositiveBallVolume)([[:space:]:({]|$)' Core/G1/SignedFarField.lean; then
+            echo 'Detached K4 analytic declaration detected.'; exit 1
           fi
-          if grep -E -q '^[[:space:]]*2 \* sK \+ 2 \* sD - 3[[:space:]]*$' Core/G1/K4ScalingAudit.lean; then
-            echo 'Obsolete standalone exponent expression detected.'; exit 1
+          if grep -E -q '^[[:space:]]*(oscillation[[:space:]]*:[[:space:]]*Point3|shellBound[[:space:]]*:)' Core/G1/SignedFarField.lean; then
+            echo 'Detached K4 analytic field detected.'; exit 1
+          fi
+          # The certified determinant is 2*sK + 2*sD - 3. Reject the obsolete
+          # one-kernel-factor determinant, not the correct theorem body.
+          if grep -E -q '^[[:space:]]*sK[[:space:]]*\+[[:space:]]*2[[:space:]]*\*[[:space:]]*sD[[:space:]]*-[[:space:]]*3[[:space:]]*$' Core/G1/K4ScalingAudit.lean; then
+            echo 'Obsolete one-kernel-factor exponent expression detected.'; exit 1
           fi
       - name: No proof-gap constructs
         run: |
