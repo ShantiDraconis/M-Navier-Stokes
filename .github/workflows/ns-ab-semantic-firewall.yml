@@ -1,0 +1,85 @@
+name: NS A-B semantic firewall
+
+on:
+  push:
+    branches:
+      - 'audit/ns-ab-semantic-firewall'
+  pull_request:
+    branches:
+      - 'infra/s1-real-lock-v4.32.1'
+
+permissions:
+  contents: read
+
+jobs:
+  ab-firewall:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Frozen S1 parent and additive delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          PARENT=a6022f128d87103c4045d893b68471f05def316f
+          git merge-base --is-ancestor "$PARENT" HEAD
+          if git diff --name-status "$PARENT"..HEAD | grep '^D'; then exit 1; fi
+          while read -r status path; do
+            test -z "${path:-}" && continue
+            case "$path" in
+              Core/G1/ABSemanticFirewall.lean|audit/AB_SEMANTIC_FIREWALL.md|.github/workflows/ns-ab-semantic-firewall.yml) ;;
+              *) echo "FAIL unexpected delta $status $path"; exit 1 ;;
+            esac
+          done < <(git diff --name-status "$PARENT"..HEAD)
+          echo "AB_ADDITIVE_FOOTPRINT=PASS"
+
+      - name: Verify committed S1 lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f lake-manifest.json
+          jq -e '.packages[] | select(.name=="mathlib") | select(.rev=="520045ab14e26149ee970e2e617ca04b09bde5d6") | select(.inputRev=="v4.32.1")' lake-manifest.json >/dev/null
+
+      - name: Install pinned Lean
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y --default-toolchain leanprover/lean4:v4.32.1
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Hydrate lock only
+        shell: bash
+        run: |
+          set -euo pipefail
+          lake exe cache get
+
+      - name: Compile A/B semantic firewall
+        shell: bash
+        run: |
+          set -euo pipefail
+          lake env lean Core/G1/ABSemanticFirewall.lean | tee /tmp/ab.log
+          ! grep -q 'sorryAx' /tmp/ab.log
+
+      - name: No-placebo source scan
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -n -E '(^|[^[:alnum:]_])(sorry|admit|sorryAx)([^[:alnum:]_]|$)|^[[:space:]]*axiom[[:space:]]' Core/G1/ABSemanticFirewall.lean; then
+            exit 1
+          fi
+
+      - name: Semantic status
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'BARE_INTERFACES_REQUIRE_ADDITIONAL_HYPOTHESES' Core/G1/ABSemanticFirewall.lean
+          grep -q 'STATEWISE_DOES_NOT_IMPLY_UNIFORM_GLOBAL_CONSTANT' Core/G1/ABSemanticFirewall.lean
+          grep -q 'OPEN_BRIDGE_PENDING_CONCRETE_CLAY_INSTANTIATION' Core/G1/ABSemanticFirewall.lean
+          echo "A_BARE_AUTOMATIC=REFUTED"
+          echo "B_BARE_AUTOMATIC=REFUTED"
+          echo "CFAR_STATEWISE_TO_UNIFORM=REFUTED"
+          echo "ACTUAL_NS_TO_UNIFORM_SIGNED_CZ=OPEN_BRIDGE"
+          echo "SIGNED_CZ_MATH=OPEN"
+          echo "FECHADO_FECHADO_FECHADO=NO"
