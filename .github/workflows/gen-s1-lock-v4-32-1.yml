@@ -1,0 +1,80 @@
+name: gen-s1-lock-v4-32-1
+
+on:
+  push:
+    branches:
+      - 'infra/s1-real-lock-v4.32.1'
+  pull_request:
+    branches:
+      - 'audit/ns-maximal-frontier-20260918'
+
+permissions:
+  contents: write
+
+jobs:
+  generate-lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install pinned Lean
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y --default-toolchain leanprover/lean4:v4.32.1
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Regenerate real S1 Lake lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(cat lean-toolchain)" = "leanprover/lean4:v4.32.1"
+          if test -f lake-manifest.json; then
+            cp lake-manifest.json /tmp/committed-lake-manifest.json
+          fi
+          rm -f lake-manifest.json
+          lake update
+          test -f lake-manifest.json
+          if test -f /tmp/committed-lake-manifest.json; then
+            cmp -s /tmp/committed-lake-manifest.json lake-manifest.json || {
+              echo "FAIL: regenerated lock differs from committed lock"
+              diff -u /tmp/committed-lake-manifest.json lake-manifest.json || true
+              exit 1
+            }
+            echo "REGENERATED_LOCK_MATCHES_COMMITTED=true"
+          fi
+          echo "LOCK_PACKAGES"
+          jq -c '.packages[] | {name, rev, inputRev}' lake-manifest.json
+          jq -e '.packages[] | select(.name=="mathlib") | select(.rev=="520045ab14e26149ee970e2e617ca04b09bde5d6") | select(.inputRev=="v4.32.1")' lake-manifest.json >/dev/null
+          echo "LOCK_JSON_BASE64_BEGIN"
+          base64 -w0 lake-manifest.json
+          echo
+          echo "LOCK_JSON_BASE64_END"
+          sha256sum lake-manifest.json
+
+      - name: Record provenance facts
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "FROZEN_PARENT=c56d9632facf96e0a5d834b987b30df5fe2563a1"
+          echo "REFERENCE_RUN=35329861796"
+          echo "REFERENCE_RUN_FINAL_STATUS=FAILURE_AT_ASSUMPTION_LAUNDERING"
+          echo "REFERENCE_BOOTSTRAP_RESOLVED_MATHLIB=520045ab14e26149ee970e2e617ca04b09bde5d6"
+          echo "THIS_LOCK_SOURCE=DETERMINISTIC_REGENERATION"
+
+      - name: Commit Lake-generated lock
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lake-manifest.json
+          if git diff --cached --quiet; then
+            echo "LOCK_ALREADY_CURRENT=true"
+          else
+            git commit -m "infra: commit Lake-generated dependency lock"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
