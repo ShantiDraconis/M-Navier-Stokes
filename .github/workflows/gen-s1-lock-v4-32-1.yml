@@ -9,7 +9,7 @@ on:
       - 'audit/ns-maximal-frontier-20260918'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   generate-lock:
@@ -52,3 +52,18 @@ jobs:
           echo "REFERENCE_RUN_FINAL_STATUS=FAILURE_AT_ASSUMPTION_LAUNDERING"
           echo "REFERENCE_BOOTSTRAP_RESOLVED_MATHLIB=520045ab14e26149ee970e2e617ca04b09bde5d6"
           echo "THIS_LOCK_SOURCE=DETERMINISTIC_REGENERATION"
+
+      - name: Commit Lake-generated lock
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lake-manifest.json
+          if git diff --cached --quiet; then
+            echo "LOCK_ALREADY_CURRENT=true"
+          else
+            git commit -m "infra: commit Lake-generated dependency lock"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
