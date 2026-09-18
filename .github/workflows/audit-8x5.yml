@@ -148,7 +148,7 @@ jobs:
 
       - name: L7b locked-successor cache and IMath
         id: l7b
-        working-directory: _frozen_s1
+        working-directory: _s1_locked
         run: |
           set -euo pipefail
           (lake exe cache get || true) 2>&1 | tee L7b-cache.log
@@ -165,7 +165,7 @@ jobs:
 
       - name: L7c locked-successor G1 library
         id: l7c
-        working-directory: _frozen_s1
+        working-directory: _s1_locked
         run: |
           set -euo pipefail
           lake build G1 2>&1 | tee L7c.log
@@ -179,7 +179,7 @@ jobs:
 
       - name: L7d MaximalFrontier
         id: l7d
-        working-directory: _frozen_s1
+        working-directory: _s1_locked
         run: |
           set -euo pipefail
           lake env lean Core/G1/MaximalFrontier.lean 2>&1 | tee L7d.log
@@ -193,7 +193,7 @@ jobs:
 
       - name: L7e ClosedClosedClosedTarget
         id: l7e
-        working-directory: _frozen_s1
+        working-directory: _s1_locked
         run: |
           set -euo pipefail
           lake env lean Core/G1/ClosedClosedClosedTarget.lean 2>&1 | tee L7e.log
@@ -207,7 +207,7 @@ jobs:
 
       - name: L7f locked-successor snapshot integrity
         id: l7f
-        working-directory: _frozen_s1
+        working-directory: _s1_locked
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "cf4e2553ff2234a80dc7f88b7d433a9b1eafc4c0"
