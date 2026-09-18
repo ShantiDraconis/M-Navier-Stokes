@@ -81,8 +81,11 @@ jobs:
           set -euo pipefail
           lake update
           lake exe cache get || true
+          # Build the frozen source libraries. IMath is a srcDir=Vendor library;
+          # its root module is IMath, while G1 is the srcDir=Core library.
           lake build IMath
           lake build G1
+          lake env lean Core/G1/MaximalFrontier.lean
           lake env lean Core/G1/ClosedClosedClosedTarget.lean
 
       - name: L8 NO-PLACEBO frozen source
