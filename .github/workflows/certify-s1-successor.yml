@@ -145,20 +145,16 @@ jobs:
           fi
           echo "L8_NO_PLACEBO=PASS"
 
-      - name: Emission firewall — preserve blocking residue
+      - name: Emission firewall — static pass, semantic DAG still required
         shell: bash
         run: |
           set -euo pipefail
-          set +e
           python3 scripts/check_assumption_laundering.py | tee /tmp/laundering.log
-          rc=${PIPESTATUS[0]}
-          set -e
-          test "$rc" -eq 2
-          grep -q 'SUSPICIOUS_INTERSECTION field=Core/G1/MaximalFrontier.lean::DownstreamWiring.UniformEnstrophy' /tmp/laundering.log
-          grep -q 'SUSPICIOUS_INTERSECTION field=Core/G1/MaximalFrontier.lean::DownstreamWiring.CriticalL3' /tmp/laundering.log
-          grep -q 'SUSPICIOUS_INTERSECTION field=Core/G1/MaximalFrontier.lean::DownstreamWiring.GlobalRegularity' /tmp/laundering.log
-          grep -q 'FAIL: new premise/result intersection requires semantic review.' /tmp/laundering.log
-          echo "ASSUMPTION_LAUNDERING=BLOCKING_RESIDUE_CONFIRMED"
+          grep -q 'PASS_STATIC: no new exact normalized premise/result intersection' /tmp/laundering.log
+          grep -q 'semantic DAG still required' /tmp/laundering.log
+          echo "ASSUMPTION_LAUNDERING_STATIC=PASS"
+          echo "SEMANTIC_DAG_REQUIRED=YES"
+          echo "A_B_FRONTIER=OPEN"
           echo "FECHADO_FECHADO_FECHADO=NO"
 
       - name: Successor certification summary
@@ -166,6 +162,6 @@ jobs:
         run: |
           set -euo pipefail
           echo "S1_INFRA_LOCK=GREEN"
-          echo "L1_L8_MECHANICAL=GREEN_WITH_EXPLICIT_LAUNDERING_RESIDUE"
+          echo "L1_L8_MECHANICAL=GREEN"
           echo "SCIENTIFIC_FRONTIER=OPEN"
           echo "FECHADO_FECHADO_FECHADO=NO"
