@@ -1,0 +1,72 @@
+name: gen-lock-audit-writer-v4321
+
+on:
+  push:
+    branches: [audit/multistate-proof-refutation-v1]
+    paths:
+      - '.github/workflows/gen-lock-audit-writer-v4321.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate-writer-lock:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify writer inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(cat lean-toolchain)" = "leanprover/lean4:v4.32.1"
+          grep -q 'mathlib4.git" @ "v4.32.1"' lakefile.lean
+          test ! -f lake-manifest.json
+
+      - name: Install exact writer toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl https://elan.lean-lang.org/elan-init.sh -sSf | sh -s -- -y --default-toolchain leanprover/lean4:v4.32.1
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Generate writer manifest with Lake
+        shell: bash
+        run: |
+          set -euo pipefail
+          lake update
+          test -f lake-manifest.json
+          jq -e '
+            [.packages[] |
+              select(.name == "mathlib") |
+              select(.inputRev == "v4.32.1") |
+              select(.rev == "520045ab14e26149ee970e2e617ca04b09bde5d6")
+            ] | length == 1
+          ' lake-manifest.json
+          sha256sum lake-manifest.json | tee audit-writer-lake-manifest.sha256
+
+      - name: Upload writer lock
+        if: always() && hashFiles('lake-manifest.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-writer-lock-v4321-${{ github.run_id }}
+          path: |
+            lake-manifest.json
+            audit-writer-lake-manifest.sha256
+
+      - name: Commit Lake-generated writer lock only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --quiet -- lakefile.lean lean-toolchain Core Vendor audit scripts .github
+          git add lake-manifest.json
+          CACHED="$(git diff --cached --name-status)"
+          EXPECTED="$(printf 'A\tlake-manifest.json')"
+          test "$CACHED" = "$EXPECTED"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "infra(ns-audit): materialize Lake-generated writer lock v4.32.1"
+          git push origin HEAD:refs/heads/audit/multistate-proof-refutation-v1
