@@ -173,7 +173,7 @@ jobs:
           git rev-parse HEAD | tee /tmp/L7b-diag/S1_SUCCESSOR_SHA.txt
           git rev-parse HEAD^ | tee /tmp/L7b-diag/S1_PARENT_SHA.txt
           git rev-parse HEAD^{tree} | tee /tmp/L7b-diag/S1_SUCCESSOR_TREE.txt
-          git rev-parse HEAD^:{tree} 2>/dev/null || true
+          git rev-parse HEAD^^{tree} | tee /tmp/L7b-diag/S1_PARENT_TREE.txt
 
       - name: L7b cache get isolated
         id: l7b_cache
@@ -294,6 +294,29 @@ jobs:
             exit 1
           fi
           python3 scripts/check_assumption_laundering.py
+
+      - name: Generate S1 certificate manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 scripts/generate_s1_certificate.py | tee /tmp/s1-certificate-generation.log
+          test -s audit/CERTIFICATE_S1.json
+          jq -e '.mathematical_promotion == false' audit/CERTIFICATE_S1.json
+          jq -e '.endpoint.emit_closed_closed_closed == false' audit/CERTIFICATE_S1.json
+          jq -e '.locked_successor.sha == "cf4e2553ff2234a80dc7f88b7d433a9b1eafc4c0"' audit/CERTIFICATE_S1.json
+          sha256sum audit/CERTIFICATE_S1.json | tee audit/CERTIFICATE_S1.sha256
+
+      - name: Upload S1 certificate manifest
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: s1-certificate-${{ github.run_id }}
+          path: |
+            audit/CERTIFICATE_S1.json
+            audit/CERTIFICATE_S1.sha256
+            /tmp/s1-certificate-generation.log
+          if-no-files-found: error
 
       - name: Upload S1 certification evidence
         if: always()
