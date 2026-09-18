@@ -109,3 +109,31 @@ Pinned independently:
 - I source tree: `320300ea2a637eaab4e5c052cb3fef3fca65f77c`
 - I audit seal: `919fc815ae713f05e5f8d781636f89e74e8fbbbc`
 - current I-to-NS bridge status: `NO_BRIDGE_CLAIM`
+
+
+## RED run 2
+
+- source commit: `f57efdba5e57f41b7d8a4647cf81238e9c5dc122`
+- source tree: `ed34b81d4d3e9fc1865c7962cbd8163813fd6bbd`
+- commit time: `2026-09-18T09:23:47Z`
+- workflow run: `35329315533`
+- job: `105549712198`
+- completed: `2026-09-18T09:28:23Z`
+- conclusion: `RED_BUILD`
+
+Progress before the failure:
+
+- static proof-gap/axiom/True scan: GREEN
+- K4DenseAssembly: GREEN after compatibility repair
+- K4HabitabilityReduction: GREEN after compatibility repair
+
+Remaining mechanical failures:
+
+1. `K4KernelNondegeneracy.lean`: `subst w.Kdata` is invalid in Lean 4.32
+   because `subst` expects a variable reference; repaired by rewriting with `hK`.
+2. `K4ExplicitRieszKernel.lean`: the historical coordinate-function literal no
+   longer elaborates directly as `EuclideanSpace ℝ (Fin 3)`; repaired using
+   `EuclideanSpace.single (0 : Fin 3) 1`. The oddness proof is made explicit.
+
+Any `sorryAx` printed in this RED arose from elaborator recovery after those
+errors. The source scan remained GREEN.

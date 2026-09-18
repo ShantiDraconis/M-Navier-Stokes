@@ -1,7 +1,12 @@
-/-
+/- 
 K4 explicit physical-space kernel candidate.
 This file remains inside the single K4 macro-gate.
 No CZ conclusion is assumed: each analytic contract is proved locally.
+
+Historical source:
+  commit 823be9b2e6c722fd4a664493c4c53553071192ff
+  blob   a969dd16f8890caa37fbfbbd09da1435297da889
+This revision repairs the Euclidean basis-vector construction for Lean 4.32.
 -/
 import G1.K4HabitabilityReduction
 import Mathlib.Analysis.InnerProductSpace.NormPow
@@ -12,14 +17,15 @@ open scoped RealInnerProductSpace
 namespace G1Audit
 
 /-- Fixed first Euclidean direction in R^3. -/
-def k4e0 : Point3 := fun i => if i = 0 then 1 else 0
+def k4e0 : Point3 :=
+  EuclideanSpace.single (0 : Fin 3) (1 : ℝ)
 
 lemma k4e0_norm : ‖k4e0‖ = 1 := by
   rw [EuclideanSpace.norm_eq]
-  simp [k4e0]
+  simp [k4e0, EuclideanSpace.single_apply]
 
 /-- Scalar degree -3 Riesz-type kernel K(z)=<e0,z>/||z||^4.
-Division at z=0 is harmless in Lean and gives K(0)=0. -/
+Division at z=0 is totalized by Lean and gives K(0)=0. -/
 def rieszScalarKernel (z : Point3) : ℝ :=
   inner ℝ k4e0 z / ‖z‖ ^ 4
 
@@ -31,7 +37,8 @@ lemma rieszScalarKernel_zero : rieszScalarKernel 0 = 0 := by
 
 lemma rieszScalarKernel_odd (z : Point3) :
     rieszScalarKernel (-z) = -rieszScalarKernel z := by
-  simp [rieszScalarKernel]
+  simp only [rieszScalarKernel, inner_neg_right, norm_neg]
+  ring
 
 /-- Numerator estimate used by the CZ size certificate. -/
 lemma rieszScalarKernel_numerator_bound (z : Point3) :

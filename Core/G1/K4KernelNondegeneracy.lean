@@ -1,11 +1,15 @@
-/-
+/- 
 K4 kernel nondegeneracy reduction.
 
-This stays inside the existing K4 macro-gate.  It proves that the degenerate
+This stays inside the existing K4 macro-gate. It proves that the degenerate
 zero kernel can satisfy structural CZ/cancellation packaging but can never
 satisfy the strict far-field positivity required by
-AdmissibleAngularBlindWitness.  Hence a genuine witness must use a nonzero
+AdmissibleAngularBlindWitness. Hence a genuine witness must use a nonzero
 kernel; positivity cannot be obtained from packaging alone.
+
+Historical source:
+  commit e000acfb2a3926a7f2327290bc38ea6c3aeeb152
+This revision only replaces a Lean-4.32-invalid field subst by rewriting.
 -/
 import G1.K4HabitabilityReduction
 
@@ -65,7 +69,7 @@ theorem no_admissible_witness_with_zero_kernel
   have hzero :
       FarFieldSqAvg w.Kdata w.D w.center w.rho w.hrho
         (fun _ : Point3 => w.v) w.mag w.phi w.r = 0 := by
-    subst w.Kdata
+    rw [hK]
     exact farFieldSqAvg_zero_kernel w.D w.center w.rho w.hrho
       (fun _ : Point3 => w.v) w.mag w.phi w.r
   linarith [w.farField_pos]
