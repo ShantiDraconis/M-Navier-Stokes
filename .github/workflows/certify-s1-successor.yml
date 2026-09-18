@@ -1,0 +1,171 @@
+name: certify-s1-successor
+
+on:
+  push:
+    branches:
+      - 'infra/s1-real-lock-v4.32.1'
+  pull_request:
+    branches:
+      - 'audit/ns-maximal-frontier-20260918'
+
+permissions:
+  contents: read
+
+jobs:
+  certify-s1:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: L1 SOURCE_BASE_EXACT
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE=c56d9632facf96e0a5d834b987b30df5fe2563a1
+          git merge-base --is-ancestor "$BASE" HEAD
+          git cat-file -e "$BASE^{commit}"
+          echo "L1_SOURCE_BASE_EXACT=$BASE"
+
+      - name: L2 FROZEN_S1 source footprint
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE=c56d9632facf96e0a5d834b987b30df5fe2563a1
+          if git diff --name-status "$BASE"..HEAD | grep '^D'; then
+            echo "FAIL: deletion detected"
+            exit 1
+          fi
+          while read -r status path; do
+            test -z "${path:-}" && continue
+            case "$path" in
+              lake-manifest.json|.github/workflows/gen-s1-lock-v4-32-1.yml|.github/workflows/certify-s1-successor.yml) ;;
+              *) echo "FAIL: frozen S1 mutation/unexpected addition $status $path"; exit 1 ;;
+            esac
+          done < <(git diff --name-status "$BASE"..HEAD)
+          git diff --quiet "$BASE"..HEAD -- Core Vendor scripts lakefile.lean lean-toolchain
+          echo "L2_FROZEN_S1=PASS"
+
+      - name: Install pinned Lean
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(cat lean-toolchain)" = "leanprover/lean4:v4.32.1"
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y --default-toolchain leanprover/lean4:v4.32.1
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: L3 ENDPOINT_DEFINITION
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'def ClosedClosedClosedTarget' Core/G1/ClosedClosedClosedTarget.lean
+          grep -q 'def FINAL_STATEMENT' Core/G1/MaximalFrontier.lean
+          echo "L3_ENDPOINT_DEFINITION=PASS"
+
+      - name: L4 COMPRESSION
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'theorem EndpointCompression' Core/G1/MaximalFrontier.lean
+          grep -q 'def G5NSBridge' Core/G1/MaximalFrontier.lean
+          echo "L4_COMPRESSION=PASS"
+
+      - name: L5 8x5 semantic source audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'def TerminalFlexibleG1' Core/G1/MaximalFrontier.lean
+          grep -q 'theorem strictG1_to_decay' Core/G1/MaximalFrontier.lean
+          grep -q 'theorem k4_factorization_closes_G5' Core/G1/MaximalFrontier.lean
+          echo "L5_8X5_SOURCE_AUDIT=PASS"
+
+      - name: L6 RESIDUE_CLASSIFIER
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'REAL_FRONTIER=G5_NS_ActualNS_to_TerminalFlexibleG1' .github/workflows/certify-ns-maximal-frontier.yml
+          echo "L6_RESIDUE_CLASSIFIER=PASS"
+          echo "REAL_FRONTIER=G5_NS_ActualNS_to_TerminalFlexibleG1"
+
+      - name: L7a committed lock diagnostic only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f lake-manifest.json
+          cat lake-manifest.json
+          jq -e '.packages | length > 0' lake-manifest.json >/dev/null
+          jq -e '.packages[] | select(.name=="mathlib") | select(.rev=="520045ab14e26149ee970e2e617ca04b09bde5d6") | select(.inputRev=="v4.32.1")' lake-manifest.json >/dev/null
+          echo "L7A_LOCK_DIAGNOSTIC=PASS"
+          echo "L7A_NETWORK_RESOLUTION=DISABLED"
+
+      - name: L7b locked cache and IMath
+        shell: bash
+        run: |
+          set -euo pipefail
+          lake exe cache get
+          lake build IMath
+          echo "L7B_IMATH=PASS"
+
+      - name: L7c frozen G1 library
+        shell: bash
+        run: |
+          set -euo pipefail
+          lake build G1
+          echo "L7C_G1=PASS"
+
+      - name: L7d MaximalFrontier
+        shell: bash
+        run: |
+          set -euo pipefail
+          lake env lean Core/G1/MaximalFrontier.lean
+          echo "L7D_MAXIMAL_FRONTIER=PASS"
+
+      - name: L7e ClosedClosedClosedTarget
+        shell: bash
+        run: |
+          set -euo pipefail
+          lake env lean Core/G1/ClosedClosedClosedTarget.lean
+          echo "L7E_CLOSED_TARGET_SPEC=PASS"
+
+      - name: L7f frozen snapshot integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE=c56d9632facf96e0a5d834b987b30df5fe2563a1
+          git diff --quiet "$BASE"..HEAD -- Core Vendor scripts lakefile.lean lean-toolchain
+          echo "L7F_SNAPSHOT_INTEGRITY=PASS"
+
+      - name: L8 NO-PLACEBO
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -R -n -E '(^|[^[:alnum:]_])(sorry|admit|sorryAx)([^[:alnum:]_]|$)|^[[:space:]]*axiom[[:space:]]|:[[:space:]]*True([[:space:]]|$)' Core Vendor --include='*.lean'; then
+            exit 1
+          fi
+          echo "L8_NO_PLACEBO=PASS"
+
+      - name: Emission firewall — preserve blocking residue
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          python3 scripts/check_assumption_laundering.py | tee /tmp/laundering.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          test "$rc" -eq 2
+          grep -q 'SUSPICIOUS_INTERSECTION field=Core/G1/MaximalFrontier.lean::DownstreamWiring.UniformEnstrophy' /tmp/laundering.log
+          grep -q 'SUSPICIOUS_INTERSECTION field=Core/G1/MaximalFrontier.lean::DownstreamWiring.CriticalL3' /tmp/laundering.log
+          grep -q 'SUSPICIOUS_INTERSECTION field=Core/G1/MaximalFrontier.lean::DownstreamWiring.GlobalRegularity' /tmp/laundering.log
+          grep -q 'FAIL: new premise/result intersection requires semantic review.' /tmp/laundering.log
+          echo "ASSUMPTION_LAUNDERING=BLOCKING_RESIDUE_CONFIRMED"
+          echo "FECHADO_FECHADO_FECHADO=NO"
+
+      - name: Successor certification summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "S1_INFRA_LOCK=GREEN"
+          echo "L1_L8_MECHANICAL=GREEN_WITH_EXPLICIT_LAUNDERING_RESIDUE"
+          echo "SCIENTIFIC_FRONTIER=OPEN"
+          echo "FECHADO_FECHADO_FECHADO=NO"
