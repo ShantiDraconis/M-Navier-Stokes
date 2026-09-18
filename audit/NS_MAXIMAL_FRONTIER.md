@@ -137,3 +137,54 @@ Remaining mechanical failures:
 
 Any `sorryAx` printed in this RED arose from elaborator recovery after those
 errors. The source scan remained GREEN.
+
+
+## Run 3 — build GREEN, semantic firewall RED
+
+- source commit: `cc681980b0bf53267fce9aba7e7ff465c7994d86`
+- source tree: `aa5dac66ad782658864defb573d9acf35a0d3728`
+- workflow run: `35329861796`
+- job: `105551466246`
+- completed: `2026-09-18T09:35:10Z`
+- overall conclusion: `RED_FIREWALL`
+
+All Lean/build stages were GREEN:
+
+- source proof-gap scan: GREEN
+- `lake build G1`: GREEN, 8672 jobs
+- `MaximalFrontier.lean`: GREEN
+- `K4DenseAssembly.lean`: GREEN
+- `K4ExplicitRieszKernel.lean`: GREEN
+- `K4KernelNondegeneracy.lean`: GREEN
+
+The only failure was the conservative static laundering detector. It treated
+the proposition-family fields
+
+- `UniformEnstrophy : State -> Prop`
+- `CriticalL3 : State -> Prop`
+- `GlobalRegularity : State -> Prop`
+
+as if they were proof-carrying premises because their *types* contain an arrow.
+That is a parser false positive: these fields name predicates; they do not
+supply proofs of any instance of those predicates.
+
+The successor repair excludes bare predicate-family types from premise/result
+intersection while retaining quantified implication and relational proof-field
+checks.
+
+## Successor compression
+
+The maximal frontier is weakened to the terminal sufficient form:
+
+```text
+G5_NS = ActualNS -> TerminalFlexibleG1
+```
+
+with an existential terminal time `t0<T*`. This is strictly weaker than
+requiring the same estimate from time zero and is sufficient for the intended
+first-singular-time contradiction route.
+
+The frozen independent I-core is now vendored by exact source blob and enters
+the test harness only through the theorem `I_core_closed`. The new
+`G5FromClosedI_iff_G5` theorem proves that this already-closed beginning
+cannot hide the open G5 bridge.

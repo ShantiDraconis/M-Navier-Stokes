@@ -13,37 +13,80 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Install pinned Lean
         run: |
           curl https://elan.lean-lang.org/elan-init.sh -sSf | sh -s -- -y --default-toolchain leanprover/lean4:v4.32.1
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
       - name: Bootstrap dependencies
         run: |
           lake update
           lake exe cache get
-      - name: Reject proof-gap constructs
+
+      - name: Verify frozen I source blobs
         run: |
-          if grep -R -n -E '\bsorry\b|\badmit\b|^[[:space:]]*axiom[[:space:]]|:[[:space:]]*True([[:space:]]|$)' Core A2 --include='*.lean'; then
+          check_blob () {
+            actual="$(git hash-object "$1")"
+            test "$actual" = "$2" || {
+              echo "BLOB_MISMATCH $1 expected=$2 actual=$actual"
+              exit 1
+            }
+            echo "BLOB_OK $1 $actual"
+          }
+          check_blob Vendor/IMath.lean 57b7e8c39cf220173367039c02c38b5575b355d5
+          check_blob Vendor/IMath/Core/Expr.lean 813dc6d0d923f5670918c7bd3aea68b585539fef
+          check_blob Vendor/IMath/Core/Phi3.lean 1a37e5f44db8cef31eef7e6ad773cd9ea7e212b7
+          check_blob Vendor/IMath/Core/Embeddings.lean 146729958418e4f04db158162ecb9082c62ecee9
+          check_blob Vendor/IMath/Arithmetic/Division.lean f035dde8e1513f673de3c2425623cbb8bc02e257
+          check_blob Vendor/IMath/Arithmetic/Collapse.lean b89c13a598336f195a6926a298735cbbf362390b
+          check_blob Vendor/IMath/Algebra/Absorbing.lean 341884a06be053045cb39adb4f8d604097a98081
+          check_blob Vendor/IMath/Refinement/Realization.lean 773ee9ed6bc5d3fa1f4150770b3b0ca2bae5b8b8
+          check_blob Vendor/IMath/Analysis/Germ.lean cd4b6386b16d3f36b741d5f23f5de8a62da4ff32
+          check_blob Vendor/IMath/Geometry/Point.lean 97341101c6e86fc91fd9ffde380417c1070c874f
+          check_blob Vendor/IMath/Certificates/Core.lean 8bb83bfd90e1482dc227912cac9089fe1658d107
+
+      - name: Reject source proof-gap constructs
+        run: |
+          if grep -R -n -E '(^|[^[:alnum:]_])(sorry|admit)([^[:alnum:]_]|$)|^[[:space:]]*axiom[[:space:]]|:[[:space:]]*True([[:space:]]|$)' Core A2 Vendor --include='*.lean'; then
             exit 1
           fi
-      - name: Build dense G1 union
+
+      - name: Build frozen I core
+        run: lake build IMath
+
+      - name: Build dense G1 union and chain
         run: lake build G1
-      - name: Compile maximal frontier directly
+
+      - name: Compile terminal maximal frontier directly
         run: lake env lean Core/G1/MaximalFrontier.lean
-      - name: Compile exact divergent imports directly
+
+      - name: Compile closed-open-closed chain directly
+        run: lake env lean Core/G1/ClosedOpenClosedChain.lean
+
+      - name: Compile exact dense imports directly
         run: |
           lake env lean Core/G1/K4DenseAssembly.lean
           lake env lean Core/G1/K4ExplicitRieszKernel.lean
           lake env lean Core/G1/K4KernelNondegeneracy.lean
+
       - name: Preserve laundering firewall
         run: python3 scripts/check_assumption_laundering.py
+
       - name: Scientific boundary
         run: |
+          grep -q 'def ICoreClosed' Core/G1/ClosedOpenClosedChain.lean
+          grep -q 'theorem I_core_closed' Core/G1/ClosedOpenClosedChain.lean
+          grep -q 'def G5FromClosedI' Core/G1/ClosedOpenClosedChain.lean
+          grep -q 'theorem G5FromClosedI_iff_G5' Core/G1/ClosedOpenClosedChain.lean
+          grep -q 'def TerminalFlexibleG1' Core/G1/MaximalFrontier.lean
           grep -q 'def G5NSBridge' Core/G1/MaximalFrontier.lean
-          grep -q 'def ActualNSToK4Target' Core/G1/MaximalFrontier.lean
-          grep -q 'def K4TargetToFlexibleG1' Core/G1/MaximalFrontier.lean
-          grep -q 'theorem final_if_G5_exists' Core/G1/MaximalFrontier.lean
+          grep -q 'def FINAL_STATEMENT' Core/G1/MaximalFrontier.lean
+          grep -q 'theorem EndpointCompression' Core/G1/MaximalFrontier.lean
+          grep -q 'theorem ClosedOpenClosedChain' Core/G1/ClosedOpenClosedChain.lean
           echo "CERT_SHA=$GITHUB_SHA"
+          echo "START=GREEN_FROZEN_I_G1_G4"
           echo "REAL_FRONTIER_COUNT=1"
-          echo "REAL_FRONTIER=ActualNS_to_FlexibleG1"
+          echo "REAL_FRONTIER=G5_NS_ActualNS_to_TerminalFlexibleG1"
+          echo "END=PROVED_WIRING_CONDITIONAL"
           echo "UNCONDITIONAL_NS_REGULARITY=NOT_ESTABLISHED"

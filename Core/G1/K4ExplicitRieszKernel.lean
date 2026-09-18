@@ -22,7 +22,7 @@ def k4e0 : Point3 :=
 
 lemma k4e0_norm : ‖k4e0‖ = 1 := by
   rw [EuclideanSpace.norm_eq]
-  simp [k4e0, EuclideanSpace.single_apply]
+  simp [k4e0]
 
 /-- Scalar degree -3 Riesz-type kernel K(z)=<e0,z>/||z||^4.
 Division at z=0 is totalized by Lean and gives K(0)=0. -/
