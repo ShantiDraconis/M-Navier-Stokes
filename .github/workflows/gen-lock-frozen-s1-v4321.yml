@@ -1,0 +1,87 @@
+name: gen-lock-frozen-s1-v4321
+
+on:
+  push:
+    branches: [audit/multistate-proof-refutation-v1]
+    paths:
+      - '.github/workflows/gen-lock-frozen-s1-v4321.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate-s1-lock:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout audit writer
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout frozen S1
+        uses: actions/checkout@v4
+        with:
+          ref: c56d9632facf96e0a5d834b987b30df5fe2563a1
+          path: _regen_s1
+          fetch-depth: 1
+
+      - name: Refuse overwrite of successor
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin refs/heads/infra/frozen-S1-lock-regenerated-v4.32.1; then
+            echo "SUCCESSOR_ALREADY_EXISTS"
+            exit 1
+          fi
+
+      - name: Install exact frozen toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(cat _regen_s1/lean-toolchain)" = "leanprover/lean4:v4.32.1"
+          curl https://elan.lean-lang.org/elan-init.sh -sSf | sh -s -- -y --default-toolchain leanprover/lean4:v4.32.1
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Generate S1 manifest with Lake
+        working-directory: _regen_s1
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "c56d9632facf96e0a5d834b987b30df5fe2563a1"
+          test ! -f lake-manifest.json
+          lake update
+          test -f lake-manifest.json
+          cat lake-manifest.json
+          jq -e '
+            [.packages[] |
+              select(.name == "mathlib") |
+              select(.inputRev == "v4.32.1") |
+              select(.rev | test("^[0-9a-f]{40}$"))
+            ] | length == 1
+          ' lake-manifest.json
+          sha256sum lake-manifest.json | tee lake-manifest.sha256
+          test "$(git status --porcelain | grep -v 'lake-manifest.sha256' | sed 's/^?? //')" = "lake-manifest.json"
+
+      - name: Upload generated S1 lock
+        uses: actions/upload-artifact@v4
+        with:
+          name: frozen-s1-lock-v4321-${{ github.run_id }}
+          path: |
+            _regen_s1/lake-manifest.json
+            _regen_s1/lake-manifest.sha256
+
+      - name: Create add-only successor branch
+        working-directory: _regen_s1
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c infra/frozen-S1-lock-regenerated-v4.32.1
+          git add lake-manifest.json
+          git commit -m "infra(ns): add Lake-generated frozen S1 lock"
+          test "$(git rev-parse HEAD^)" = "c56d9632facf96e0a5d834b987b30df5fe2563a1"
+          test -z "$(git diff --name-status c56d9632facf96e0a5d834b987b30df5fe2563a1..HEAD | grep '^D' || true)"
+          test "$(git diff --name-status c56d9632facf96e0a5d834b987b30df5fe2563a1..HEAD)" = $'A\tlake-manifest.json'
+          git push origin HEAD:refs/heads/infra/frozen-S1-lock-regenerated-v4.32.1
