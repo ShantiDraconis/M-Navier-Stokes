@@ -1,0 +1,30 @@
+{
+  "schema": "8x5-certification-v1",
+  "problem": "Navier-Stokes",
+  "write_branch": "audit/multistate-proof-refutation-v1",
+  "source_head_exact": "6e17fc115336fef1c30797c2a50806c91567b920",
+  "frozen_s1": {
+    "repo": "ShantiDraconis/M-Navier-Stokes",
+    "sha": "c56d9632facf96e0a5d834b987b30df5fe2563a1",
+    "path": "Core/G1/ClosedClosedClosedTarget.lean",
+    "theorem": "I_core_closed"
+  },
+  "locks": {
+    "L1_HEAD_EXATO": "REVIEWED",
+    "L2_FROZEN_S1": "REVIEWED",
+    "L3_ENDPOINT_DEFINITION": "REVIEWED",
+    "L4_COMPRESSION": "REVIEWED",
+    "L5_6D_AUDIT": "REVIEWED",
+    "L6_RESIDUE_CLASSIFIER": "REVIEWED",
+    "L7_BUILD": "PENDING",
+    "L8_NO_PLACEBO": "PENDING"
+  },
+  "sigma": {
+    "HC": 0,
+    "Q": 0,
+    "S": 0,
+    "K": 0,
+    "A": 0
+  },
+  "emit_closed_closed_closed": false
+}
