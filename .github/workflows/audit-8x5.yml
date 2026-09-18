@@ -35,12 +35,47 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
+      - name: Setup preflight diagnostics
+        run: mkdir -p /tmp/preflight /tmp/L7b-diag /tmp/L7c-diag /tmp/L7d-diag /tmp/L7e-diag /tmp/L7f-diag /tmp/L8-diag
+
       - name: Install exact Lean toolchain
+        id: lean_setup
+        timeout-minutes: 12
         uses: leanprover/lean-action@50fcf42d2e460296f1a34b402e990d1b24f8b596
         with:
           build: false
           test: false
           lint: false
+
+      - name: Capture Lean setup evidence
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          {
+            echo "runner_os=$RUNNER_OS"
+            echo "runner_arch=$RUNNER_ARCH"
+            echo "github_sha=$GITHUB_SHA"
+            echo "toolchain_file:"
+            cat lean-toolchain
+            echo "elan:"
+            command -v elan || true
+            elan --version || true
+            echo "lean:"
+            command -v lean || true
+            lean --version || true
+            echo "lake:"
+            command -v lake || true
+            lake --version || true
+          } 2>&1 | tee /tmp/preflight/lean-setup.txt
+
+      - name: Upload Lean setup evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lean-setup-${{ github.run_id }}
+          path: /tmp/preflight/
+          if-no-files-found: error
 
       - name: L1 HEAD_EXATO
         run: |
@@ -219,48 +254,78 @@ jobs:
 
       - name: L7c locked-successor G1 library
         id: l7c
+        timeout-minutes: 25
         working-directory: _s1_locked
+        shell: bash
         run: |
-          set -euo pipefail
-          lake build G1 2>&1 | tee L7c.log
+          set +e
+          set -o pipefail
+          lake build G1 2>&1 | tee /tmp/L7c-diag/G1.log
+          rc=${PIPESTATUS[0]}
+          echo "$rc" | tee /tmp/L7c-diag/G1.exit
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
 
       - name: Upload L7c log
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: l7c-g1-${{ github.run_id }}
-          path: _s1_locked/L7c.log
+          path: /tmp/L7c-diag/
           if-no-files-found: error
+
+      - name: L7c fail-closed verdict
+        run: test "${{ steps.l7c.outputs.exit_code }}" = "0"
 
       - name: L7d MaximalFrontier
         id: l7d
+        timeout-minutes: 15
         working-directory: _s1_locked
+        shell: bash
         run: |
-          set -euo pipefail
-          lake env lean Core/G1/MaximalFrontier.lean 2>&1 | tee L7d.log
+          set +e
+          set -o pipefail
+          lake env lean Core/G1/MaximalFrontier.lean 2>&1 | tee /tmp/L7d-diag/MaximalFrontier.log
+          rc=${PIPESTATUS[0]}
+          echo "$rc" | tee /tmp/L7d-diag/MaximalFrontier.exit
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
 
       - name: Upload L7d log
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: l7d-maximal-frontier-${{ github.run_id }}
-          path: _s1_locked/L7d.log
+          path: /tmp/L7d-diag/
           if-no-files-found: error
+
+      - name: L7d fail-closed verdict
+        run: test "${{ steps.l7d.outputs.exit_code }}" = "0"
 
       - name: L7e ClosedClosedClosedTarget
         id: l7e
+        timeout-minutes: 15
         working-directory: _s1_locked
+        shell: bash
         run: |
-          set -euo pipefail
-          lake env lean Core/G1/ClosedClosedClosedTarget.lean 2>&1 | tee L7e.log
+          set +e
+          set -o pipefail
+          lake env lean Core/G1/ClosedClosedClosedTarget.lean 2>&1 | tee /tmp/L7e-diag/ClosedClosedClosedTarget.log
+          rc=${PIPESTATUS[0]}
+          echo "$rc" | tee /tmp/L7e-diag/ClosedClosedClosedTarget.exit
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
 
       - name: Upload L7e log
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: l7e-closed-target-${{ github.run_id }}
-          path: _s1_locked/L7e.log
+          path: /tmp/L7e-diag/
           if-no-files-found: error
+
+      - name: L7e fail-closed verdict
+        run: test "${{ steps.l7e.outputs.exit_code }}" = "0"
 
       - name: L7f locked-successor snapshot integrity
         id: l7f
@@ -276,24 +341,52 @@ jobs:
               echo "$p frozen=$(git rev-parse c56d9632facf96e0a5d834b987b30df5fe2563a1:$p) successor=$(git rev-parse cf4e2553ff2234a80dc7f88b7d433a9b1eafc4c0:$p)"
               test "$(git rev-parse c56d9632facf96e0a5d834b987b30df5fe2563a1:$p)" = "$(git rev-parse cf4e2553ff2234a80dc7f88b7d433a9b1eafc4c0:$p)"
             done
-          } 2>&1 | tee L7f.log
+            echo "FROZEN_TREE=$(git rev-parse c56d9632facf96e0a5d834b987b30df5fe2563a1^{tree})"
+            echo "SUCCESSOR_TREE=$(git rev-parse cf4e2553ff2234a80dc7f88b7d433a9b1eafc4c0^{tree})"
+            test "$(git rev-parse c56d9632facf96e0a5d834b987b30df5fe2563a1^{tree})" != "$(git rev-parse cf4e2553ff2234a80dc7f88b7d433a9b1eafc4c0^{tree})"
+            echo "MANIFEST_BLOB=$(git rev-parse cf4e2553ff2234a80dc7f88b7d433a9b1eafc4c0:lake-manifest.json)"
+          } 2>&1 | tee /tmp/L7f-diag/integrity.log
 
       - name: Upload L7f log
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: l7f-snapshot-integrity-${{ github.run_id }}
-          path: _s1_locked/L7f.log
+          path: /tmp/L7f-diag/
           if-no-files-found: error
 
       - name: L8 NO-PLACEBO identical locked source
+        id: l8
+        timeout-minutes: 15
         working-directory: _s1_locked
+        shell: bash
         run: |
-          set -euo pipefail
-          if grep -R -n -E '(^|[^[:alnum:]_])(sorry|admit)([^[:alnum:]_]|$)|^[[:space:]]*axiom[[:space:]]|:[[:space:]]*True([[:space:]]|$)' Core Vendor --include='*.lean'; then
-            exit 1
-          fi
-          python3 scripts/check_assumption_laundering.py
+          set +e
+          set -o pipefail
+          {
+            echo "--- forbidden source constructs ---"
+            if grep -R -n -E '(^|[^[:alnum:]_])(sorry|admit)([^[:alnum:]_]|$)|^[[:space:]]*axiom[[:space:]]|:[[:space:]]*True([[:space:]]|$)' Core Vendor --include='*.lean'; then
+              echo "FORBIDDEN_SOURCE=FOUND"
+              exit 21
+            fi
+            echo "FORBIDDEN_SOURCE=NONE"
+            python3 scripts/check_assumption_laundering.py
+          } 2>&1 | tee /tmp/L8-diag/no-placebo.log
+          rc=${PIPESTATUS[0]}
+          echo "$rc" | tee /tmp/L8-diag/no-placebo.exit
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload L8 diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: l8-diagnostics-${{ github.run_id }}
+          path: /tmp/L8-diag/
+          if-no-files-found: error
+
+      - name: L8 fail-closed verdict
+        run: test "${{ steps.l8.outputs.exit_code }}" = "0"
 
       - name: Generate S1 certificate manifest
         env:
@@ -325,12 +418,12 @@ jobs:
           name: s1-certification-evidence-${{ github.run_id }}
           path: |
             _frozen_s1/L7a.log
-            _s1_locked/L7b-cache.log
-            _s1_locked/L7b.log
-            _s1_locked/L7c.log
-            _s1_locked/L7d.log
-            _s1_locked/L7e.log
-            _s1_locked/L7f.log
+            /tmp/L7b-diag/
+            /tmp/L7c-diag/
+            /tmp/L7d-diag/
+            /tmp/L7e-diag/
+            /tmp/L7f-diag/
+            /tmp/L8-diag/
           if-no-files-found: warn
 
       - name: Emission firewall
