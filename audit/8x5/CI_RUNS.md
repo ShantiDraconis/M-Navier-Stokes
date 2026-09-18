@@ -29,3 +29,22 @@ Repair:
 - use module `Universal8x5`;
 - build `Audit8x5` before direct compilation;
 - rerun unchanged Sigma_0.
+
+
+## Run 2 — RED (module graph)
+
+- source audit commit: `7d4a09ef247e108d7301740f7f9c5e06a92a2ecf`
+- workflow: `audit-8x5-ns`
+- run: `35376949384`
+- job: `105703737631`
+- conclusion: `RED_MODULE_GRAPH`
+
+L1-L4 passed again. L5 reached the new `Audit8x5` library but the library
+root imported sibling module `Universal8x5`, which was not resolved as a
+compiled dependency under this minimal audit source root.
+
+Classification: `MECHANICAL_RED`.
+
+Dense repair: collapse the universal container and NS specialization into
+the single module `audit/Audit8x5.lean`. This changes no semantic axis and
+introduces no new lock.

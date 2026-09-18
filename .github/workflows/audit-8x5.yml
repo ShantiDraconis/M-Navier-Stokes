@@ -61,8 +61,7 @@ jobs:
           lake update
           lake exe cache get || true
           lake build Audit8x5
-          lake env lean audit/Universal8x5.lean
-          lake env lean audit/NS_8x5.lean
+          lake env lean audit/Audit8x5.lean
           grep -q '"HC": 0' audit/8x5/NS_8x5_STATE.json
           grep -q '"Q": 0' audit/8x5/NS_8x5_STATE.json
           grep -q '"S": 0' audit/8x5/NS_8x5_STATE.json
