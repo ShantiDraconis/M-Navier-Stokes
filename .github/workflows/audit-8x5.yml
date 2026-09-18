@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   certify-8x5:
@@ -158,22 +159,63 @@ jobs:
           ' _s1_locked/lake-manifest.json
           echo "S1_SUCCESSOR_IDENTITY=GREEN"
 
-      - name: L7b locked-successor cache and IMath
-        id: l7b
+      - name: L7b setup diagnostics
+        run: mkdir -p /tmp/L7b-diag
+
+      - name: L7b capture toolchain and lock
         working-directory: _s1_locked
         run: |
           set -euo pipefail
-          (lake exe cache get || true) 2>&1 | tee L7b-cache.log
-          lake build IMath 2>&1 | tee L7b.log
+          lake --version | tee /tmp/L7b-diag/lake-version.txt
+          lean --version | tee /tmp/L7b-diag/lean-version.txt
+          sha256sum lake-manifest.json | tee /tmp/L7b-diag/manifest-hash.txt
+          cp lake-manifest.json /tmp/L7b-diag/manifest.json
+          git rev-parse HEAD | tee /tmp/L7b-diag/S1_SUCCESSOR_SHA.txt
+          git rev-parse HEAD^ | tee /tmp/L7b-diag/S1_PARENT_SHA.txt
+          git rev-parse HEAD^{tree} | tee /tmp/L7b-diag/S1_SUCCESSOR_TREE.txt
+          git rev-parse HEAD^:{tree} 2>/dev/null || true
 
-      - name: Upload L7b logs
+      - name: L7b cache get isolated
+        id: l7b_cache
+        working-directory: _s1_locked
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          lake exe cache get 2>&1 | tee /tmp/L7b-diag/cache-get.log
+          rc=${PIPESTATUS[0]}
+          echo "$rc" | tee /tmp/L7b-diag/cache-get.exit
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: L7b build IMath isolated
+        id: l7b_imath
+        working-directory: _s1_locked
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          lake build IMath 2>&1 | tee /tmp/L7b-diag/lake-build-IMath.log
+          rc=${PIPESTATUS[0]}
+          echo "$rc" | tee /tmp/L7b-diag/lake-build-IMath.exit
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload L7b diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: l7b-imath-${{ github.run_id }}
-          path: |
-            _s1_locked/L7b-cache.log
-            _s1_locked/L7b.log
+          name: l7b-diagnostics-${{ github.run_id }}
+          path: /tmp/L7b-diag/
+          if-no-files-found: error
+
+      - name: L7b fail-closed verdict
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ steps.l7b_imath.outputs.exit_code }}" = "0"
+          echo "L7B_IMATH=GREEN"
+          echo "L7B_CACHE_EXIT=${{ steps.l7b_cache.outputs.exit_code }}"
 
       - name: L7c locked-successor G1 library
         id: l7c
@@ -188,6 +230,7 @@ jobs:
         with:
           name: l7c-g1-${{ github.run_id }}
           path: _s1_locked/L7c.log
+          if-no-files-found: error
 
       - name: L7d MaximalFrontier
         id: l7d
@@ -202,6 +245,7 @@ jobs:
         with:
           name: l7d-maximal-frontier-${{ github.run_id }}
           path: _s1_locked/L7d.log
+          if-no-files-found: error
 
       - name: L7e ClosedClosedClosedTarget
         id: l7e
@@ -216,6 +260,7 @@ jobs:
         with:
           name: l7e-closed-target-${{ github.run_id }}
           path: _s1_locked/L7e.log
+          if-no-files-found: error
 
       - name: L7f locked-successor snapshot integrity
         id: l7f
@@ -239,6 +284,7 @@ jobs:
         with:
           name: l7f-snapshot-integrity-${{ github.run_id }}
           path: _s1_locked/L7f.log
+          if-no-files-found: error
 
       - name: L8 NO-PLACEBO identical locked source
         working-directory: _s1_locked
