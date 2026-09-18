@@ -10,12 +10,13 @@ permissions:
 
 jobs:
   certify-8x5:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout audit writer
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Checkout frozen S1
         uses: actions/checkout@v4
@@ -23,6 +24,15 @@ jobs:
           ref: c56d9632facf96e0a5d834b987b30df5fe2563a1
           path: _frozen_s1
           fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout add-only locked S1 successor
+        uses: actions/checkout@v4
+        with:
+          ref: cf4e2553ff2234a80dc7f88b7d433a9b1eafc4c0
+          path: _s1_locked
+          fetch-depth: 1
+          persist-credentials: false
 
       - name: Install Lean
         run: |
@@ -95,10 +105,13 @@ jobs:
               echo "LAKE_MANIFEST_PRESENT=NO"
               echo "HERMETICITY_STATUS=MISSING_COMMITTED_LOCK"
             fi
-            echo "--- historical GREEN provenance ---"
-            echo "GREEN_RUN=35329861796"
-            echo "GREEN_SHA=cc681980b0bf53267fce9aba7e7ff465c7994d86"
-            echo "GREEN_WORKFLOW_BOOTSTRAP=lake_update_then_cache_get"
+            echo "--- historical provenance ---"
+            echo "HISTORICAL_RED_RUN=35329861796"
+            echo "HISTORICAL_RED_STATUS=FAILURE_NO_ARTIFACTS"
+            echo "NETWORK_RESOLVED_SUCCESS_RUN=35332836485"
+            echo "NETWORK_RESOLVED_SUCCESS_CLASS=NON_HERMETIC_LAKE_UPDATE"
+            echo "LOCK_SUCCESSOR_SHA=cf4e2553ff2234a80dc7f88b7d433a9b1eafc4c0"
+            echo "LOCK_MANIFEST_SHA256=6b7329f16d157be7350dd1fedb61011620be3210fa03d5498380d59e6b109876"
           } 2>&1 | tee L7a.log
 
       - name: Upload L7a diagnosis
@@ -108,17 +121,32 @@ jobs:
           name: l7a-frozen-provenance-${{ github.run_id }}
           path: _frozen_s1/L7a.log
 
-      - name: L7a hermeticity gate
-        working-directory: _frozen_s1
+      - name: L7a successor provenance and source identity
+        shell: bash
         run: |
           set -euo pipefail
-          test -f lake-manifest.json || {
-            echo "BLOCKING_INFRA: frozen S1 has no committed lake-manifest.json"
-            echo "Do not run lake update inside the frozen certification path."
-            exit 1
-          }
+          test "$(git -C _frozen_s1 rev-parse HEAD)" = "c56d9632facf96e0a5d834b987b30df5fe2563a1"
+          test "$(git -C _s1_locked rev-parse HEAD)" = "cf4e2553ff2234a80dc7f88b7d433a9b1eafc4c0"
+          test "$(git show -s --format=%P cf4e2553ff2234a80dc7f88b7d433a9b1eafc4c0)" = "c56d9632facf96e0a5d834b987b30df5fe2563a1"
+          EXPECTED="$(printf 'A\tlake-manifest.json')"
+          ACTUAL="$(git diff --name-status --no-renames c56d9632facf96e0a5d834b987b30df5fe2563a1..cf4e2553ff2234a80dc7f88b7d433a9b1eafc4c0)"
+          test "$ACTUAL" = "$EXPECTED"
+          test -z "$(git diff --diff-filter=D --name-only c56d9632facf96e0a5d834b987b30df5fe2563a1..cf4e2553ff2234a80dc7f88b7d433a9b1eafc4c0)"
+          for p in Core Vendor scripts lakefile.lean lean-toolchain; do
+            test "$(git rev-parse c56d9632facf96e0a5d834b987b30df5fe2563a1:$p)" = "$(git rev-parse cf4e2553ff2234a80dc7f88b7d433a9b1eafc4c0:$p)"
+          done
+          test -f _s1_locked/lake-manifest.json
+          echo "6b7329f16d157be7350dd1fedb61011620be3210fa03d5498380d59e6b109876  _s1_locked/lake-manifest.json" | sha256sum -c -
+          jq -e '
+            [.packages[] |
+              select(.name == "mathlib") |
+              select(.inputRev == "v4.32.1") |
+              select(.rev == "520045ab14e26149ee970e2e617ca04b09bde5d6")
+            ] | length == 1
+          ' _s1_locked/lake-manifest.json
+          echo "S1_SUCCESSOR_IDENTITY=GREEN"
 
-      - name: L7b frozen cache and IMath
+      - name: L7b locked-successor cache and IMath
         id: l7b
         working-directory: _frozen_s1
         run: |
@@ -132,10 +160,10 @@ jobs:
         with:
           name: l7b-imath-${{ github.run_id }}
           path: |
-            _frozen_s1/L7b-cache.log
-            _frozen_s1/L7b.log
+            _s1_locked/L7b-cache.log
+            _s1_locked/L7b.log
 
-      - name: L7c frozen G1 library
+      - name: L7c locked-successor G1 library
         id: l7c
         working-directory: _frozen_s1
         run: |
@@ -147,7 +175,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: l7c-g1-${{ github.run_id }}
-          path: _frozen_s1/L7c.log
+          path: _s1_locked/L7c.log
 
       - name: L7d MaximalFrontier
         id: l7d
@@ -161,7 +189,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: l7d-maximal-frontier-${{ github.run_id }}
-          path: _frozen_s1/L7d.log
+          path: _s1_locked/L7d.log
 
       - name: L7e ClosedClosedClosedTarget
         id: l7e
@@ -175,31 +203,54 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: l7e-closed-target-${{ github.run_id }}
-          path: _frozen_s1/L7e.log
+          path: _s1_locked/L7e.log
 
-      - name: L7f frozen snapshot integrity
+      - name: L7f locked-successor snapshot integrity
         id: l7f
         working-directory: _frozen_s1
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "c56d9632facf96e0a5d834b987b30df5fe2563a1"
-          git diff --exit-code -- Core Vendor lakefile.lean lean-toolchain 2>&1 | tee L7f.log
+          test "$(git rev-parse HEAD)" = "cf4e2553ff2234a80dc7f88b7d433a9b1eafc4c0"
+          {
+            echo "FROZEN=c56d9632facf96e0a5d834b987b30df5fe2563a1"
+            echo "SUCCESSOR=cf4e2553ff2234a80dc7f88b7d433a9b1eafc4c0"
+            git diff --name-status --no-renames c56d9632facf96e0a5d834b987b30df5fe2563a1..cf4e2553ff2234a80dc7f88b7d433a9b1eafc4c0
+            for p in Core Vendor scripts lakefile.lean lean-toolchain; do
+              echo "$p frozen=$(git rev-parse c56d9632facf96e0a5d834b987b30df5fe2563a1:$p) successor=$(git rev-parse cf4e2553ff2234a80dc7f88b7d433a9b1eafc4c0:$p)"
+              test "$(git rev-parse c56d9632facf96e0a5d834b987b30df5fe2563a1:$p)" = "$(git rev-parse cf4e2553ff2234a80dc7f88b7d433a9b1eafc4c0:$p)"
+            done
+          } 2>&1 | tee L7f.log
 
       - name: Upload L7f log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: l7f-snapshot-integrity-${{ github.run_id }}
-          path: _frozen_s1/L7f.log
+          path: _s1_locked/L7f.log
 
-      - name: L8 NO-PLACEBO frozen source
-        working-directory: _frozen_s1
+      - name: L8 NO-PLACEBO identical locked source
+        working-directory: _s1_locked
         run: |
           set -euo pipefail
           if grep -R -n -E '(^|[^[:alnum:]_])(sorry|admit)([^[:alnum:]_]|$)|^[[:space:]]*axiom[[:space:]]|:[[:space:]]*True([[:space:]]|$)' Core Vendor --include='*.lean'; then
             exit 1
           fi
           python3 scripts/check_assumption_laundering.py
+
+      - name: Upload S1 certification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: s1-certification-evidence-${{ github.run_id }}
+          path: |
+            _frozen_s1/L7a.log
+            _s1_locked/L7b-cache.log
+            _s1_locked/L7b.log
+            _s1_locked/L7c.log
+            _s1_locked/L7d.log
+            _s1_locked/L7e.log
+            _s1_locked/L7f.log
+          if-no-files-found: warn
 
       - name: Emission firewall
         run: |
