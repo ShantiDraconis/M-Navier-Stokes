@@ -82,7 +82,7 @@ jobs:
           echo "6b7329f16d157be7350dd1fedb61011620be3210fa03d5498380d59e6b109876  lake-manifest.json" | sha256sum -c -
           git add lake-manifest.json
           CACHED="$(git diff --cached --name-status)"
-          EXPECTED=A\tlake-manifest.json'
+          EXPECTED="$(printf 'A\tlake-manifest.json')"
           if [ "$CACHED" != "$EXPECTED" ]; then
             echo "FAIL: expected only lake-manifest.json added"
             printf 'got: %s\n' "$CACHED"
@@ -100,5 +100,7 @@ jobs:
           git commit -m "S1: add-only regenerated lock v4.32.1, parent c56d9632, sha 6b7329f1"
           test "$(git rev-parse HEAD^)" = "c56d9632facf96e0a5d834b987b30df5fe2563a1"
           test -z "$(git diff --name-status c56d9632facf96e0a5d834b987b30df5fe2563a1..HEAD | grep '^D' || true)"
-          test "$(git diff --name-status c56d9632facf96e0a5d834b987b30df5fe2563a1..HEAD)" = A\tlake-manifest.json'
+          ACTUAL="$(git diff --name-status --no-renames c56d9632facf96e0a5d834b987b30df5fe2563a1..HEAD)"
+          EXPECTED="$(printf 'A\tlake-manifest.json')"
+          test "$ACTUAL" = "$EXPECTED"
           git push origin HEAD:refs/heads/infra/frozen-S1-lock-regenerated-v4.32.1
