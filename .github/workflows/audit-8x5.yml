@@ -75,19 +75,48 @@ jobs:
           grep -q 'K: BLOCKING' audit/8x5/NS_8x5_PROTOCOL.md
           echo 'RESIDUE_CLASSIFIER=GREEN'
 
-      - name: L7a frozen lake update
+      - name: L7a frozen dependency provenance diagnosis
         id: l7a
         working-directory: _frozen_s1
         run: |
           set -euo pipefail
-          lake update 2>&1 | tee L7a.log
+          {
+            echo "FROZEN_SHA=$(git rev-parse HEAD)"
+            echo "--- lean-toolchain ---"
+            cat lean-toolchain
+            echo "--- lakefile.lean ---"
+            cat lakefile.lean
+            echo "--- lock presence ---"
+            test ! -f lakefile.toml || { echo "UNEXPECTED lakefile.toml"; cat lakefile.toml; }
+            if test -f lake-manifest.json; then
+              echo "LAKE_MANIFEST_PRESENT=YES"
+              sha256sum lake-manifest.json
+            else
+              echo "LAKE_MANIFEST_PRESENT=NO"
+              echo "HERMETICITY_STATUS=MISSING_COMMITTED_LOCK"
+            fi
+            echo "--- historical GREEN provenance ---"
+            echo "GREEN_RUN=35329861796"
+            echo "GREEN_SHA=cc681980b0bf53267fce9aba7e7ff465c7994d86"
+            echo "GREEN_WORKFLOW_BOOTSTRAP=lake_update_then_cache_get"
+          } 2>&1 | tee L7a.log
 
-      - name: Upload L7a log
+      - name: Upload L7a diagnosis
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: l7a-lake-update-${{ github.run_id }}
+          name: l7a-frozen-provenance-${{ github.run_id }}
           path: _frozen_s1/L7a.log
+
+      - name: L7a hermeticity gate
+        working-directory: _frozen_s1
+        run: |
+          set -euo pipefail
+          test -f lake-manifest.json || {
+            echo "BLOCKING_INFRA: frozen S1 has no committed lake-manifest.json"
+            echo "Do not run lake update inside the frozen certification path."
+            exit 1
+          }
 
       - name: L7b frozen cache and IMath
         id: l7b
