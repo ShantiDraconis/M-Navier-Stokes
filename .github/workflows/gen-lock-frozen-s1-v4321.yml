@@ -57,19 +57,37 @@ jobs:
             [.packages[] |
               select(.name == "mathlib") |
               select(.inputRev == "v4.32.1") |
-              select(.rev | test("^[0-9a-f]{40}$"))
+              select(.rev == "520045ab14e26149ee970e2e617ca04b09bde5d6")
             ] | length == 1
           ' lake-manifest.json
           sha256sum lake-manifest.json | tee lake-manifest.sha256
-          test "$(git status --porcelain | grep -v 'lake-manifest.sha256' | sed 's/^?? //')" = "lake-manifest.json"
+          echo "6b7329f16d157be7350dd1fedb61011620be3210fa03d5498380d59e6b109876  lake-manifest.json" | sha256sum -c -
 
-      - name: Upload generated S1 lock
+      - name: Upload generated S1 lock early
+        if: always() && hashFiles('_regen_s1/lake-manifest.json') != ''
         uses: actions/upload-artifact@v4
         with:
           name: frozen-s1-lock-v4321-${{ github.run_id }}
           path: |
             _regen_s1/lake-manifest.json
             _regen_s1/lake-manifest.sha256
+
+      - name: Validate add-only successor candidate
+        working-directory: _regen_s1
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --quiet -- Core Vendor lakefile.lean lean-toolchain scripts
+          git diff --cached --quiet -- Core Vendor lakefile.lean lean-toolchain scripts
+          echo "6b7329f16d157be7350dd1fedb61011620be3210fa03d5498380d59e6b109876  lake-manifest.json" | sha256sum -c -
+          git add lake-manifest.json
+          CACHED="$(git diff --cached --name-status)"
+          EXPECTED=A\tlake-manifest.json'
+          if [ "$CACHED" != "$EXPECTED" ]; then
+            echo "FAIL: expected only lake-manifest.json added"
+            printf 'got: %s\n' "$CACHED"
+            exit 1
+          fi
 
       - name: Create add-only successor branch
         working-directory: _regen_s1
@@ -79,9 +97,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c infra/frozen-S1-lock-regenerated-v4.32.1
-          git add lake-manifest.json
-          git commit -m "infra(ns): add Lake-generated frozen S1 lock"
+          git commit -m "S1: add-only regenerated lock v4.32.1, parent c56d9632, sha 6b7329f1"
           test "$(git rev-parse HEAD^)" = "c56d9632facf96e0a5d834b987b30df5fe2563a1"
           test -z "$(git diff --name-status c56d9632facf96e0a5d834b987b30df5fe2563a1..HEAD | grep '^D' || true)"
-          test "$(git diff --name-status c56d9632facf96e0a5d834b987b30df5fe2563a1..HEAD)" = $'A\tlake-manifest.json'
+          test "$(git diff --name-status c56d9632facf96e0a5d834b987b30df5fe2563a1..HEAD)" = A\tlake-manifest.json'
           git push origin HEAD:refs/heads/infra/frozen-S1-lock-regenerated-v4.32.1
