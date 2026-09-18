@@ -31,9 +31,20 @@ jobs:
         run: |
           set -euo pipefail
           test "$(cat lean-toolchain)" = "leanprover/lean4:v4.32.1"
-          test ! -f lake-manifest.json
+          if test -f lake-manifest.json; then
+            cp lake-manifest.json /tmp/committed-lake-manifest.json
+          fi
+          rm -f lake-manifest.json
           lake update
           test -f lake-manifest.json
+          if test -f /tmp/committed-lake-manifest.json; then
+            cmp -s /tmp/committed-lake-manifest.json lake-manifest.json || {
+              echo "FAIL: regenerated lock differs from committed lock"
+              diff -u /tmp/committed-lake-manifest.json lake-manifest.json || true
+              exit 1
+            }
+            echo "REGENERATED_LOCK_MATCHES_COMMITTED=true"
+          fi
           echo "LOCK_PACKAGES"
           jq -c '.packages[] | {name, rev, inputRev}' lake-manifest.json
           jq -e '.packages[] | select(.name=="mathlib") | select(.rev=="520045ab14e26149ee970e2e617ca04b09bde5d6") | select(.inputRev=="v4.32.1")' lake-manifest.json >/dev/null
