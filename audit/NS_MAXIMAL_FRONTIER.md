@@ -1,143 +1,111 @@
 # Navier–Stokes maximal-frontier compression
 
-Status at introduction: `AWAITING_CI / NO_PRIZE_CLAIM`
+Status: `RED_PRESERVED / REPAIR_PENDING_CI`
 
 ## Frozen source union
 
-This branch is based on:
+The audit branch starts at:
 
-- `e000acfb2a3926a7f2327290bc38ea6c3aeeb152`
-- date: `2026-09-18T00:31:14Z`
-- source tree: `924787224544d270cc77c52001c9a5bb54d3c30d`
+- base commit: `e000acfb2a3926a7f2327290bc38ea6c3aeeb152`
+- base date: `2026-09-18T00:31:14Z`
+- base tree: `924787224544d270cc77c52001c9a5bb54d3c30d`
 
-Two divergent mathematical artifacts are imported by their existing Git blob
-objects, preserving their original content exactly:
+Divergent historical artifacts were imported first by their exact original Git
+blobs, before any compatibility repair:
 
-- `Core/G1/K4DenseAssembly.lean`
-  - source commit `76acf5b3be15ff1308024f416a8371c41e94e5f4`
-  - date `2026-09-17T15:26:04Z`
-  - blob `3b1c090bfc4bdf7c45a5ef87de5111313276c03d`
-- `Core/G1/K4ExplicitRieszKernel.lean`
-  - source commit `823be9b2e6c722fd4a664493c4c53553071192ff`
-  - date `2026-09-18T02:08:14Z`
-  - blob `a969dd16f8890caa37fbfbbd09da1435297da889`
+- `K4DenseAssembly.lean`
+  - origin commit: `76acf5b3be15ff1308024f416a8371c41e94e5f4`
+  - origin date: `2026-09-17T15:26:04Z`
+  - frozen origin blob: `3b1c090bfc4bdf7c45a5ef87de5111313276c03d`
+- `K4ExplicitRieszKernel.lean`
+  - origin commit: `823be9b2e6c722fd4a664493c4c53553071192ff`
+  - origin date: `2026-09-18T02:08:14Z`
+  - frozen origin blob: `a969dd16f8890caa37fbfbbd09da1435297da889`
 
-No source SHA is rewritten.
+No historical SHA or blob is rewritten.
 
-## Maximum certified frontier
+## RED run 1
 
-The current repository can mechanically reach:
+- source commit: `831dd42c6dff7e2b2551a50da4164289503f7df7`
+- source tree: `f15e0e25dc942de8fd8e369ebe01f4f6e0814758`
+- commit time: `2026-09-18T09:15:38Z`
+- workflow run: `35328607508`
+- job: `105547454634`
+- completed: `2026-09-18T09:19:54Z`
+- conclusion: `RED_BUILD`
 
-1. exact signed far-field definitions and scale bookkeeping;
-2. K4 p=3 scaling compatibility conditional on dimensionless direction scaling;
-3. constant-direction blindness of the current directional observable;
-4. exact reduction of an admissible angular-blind witness to core obligations;
-5. exclusion of the zero kernel from any strictly positive far-field witness;
-6. a concrete nonzero Riesz-type kernel candidate with basic oddness and size primitives;
-7. conditional dyadic shell assembly;
-8. Campanato barrier algebra;
-9. algebraic conversion of a genuine signed-depletion estimate into a dissipative/Gronwall-ready differential inequality.
+What passed before the failure:
 
-The maximum compressed real frontier is therefore
+- pinned Lean installation: GREEN
+- dependencies/cache: GREEN
+- source proof-hole scan: GREEN
+- source project-axiom scan: GREEN
+- source `: True` specification scan: GREEN
 
-[
-oxed{
-G5_{NS}:quad
-mathrm{ActualNS}
-Longrightarrow
-exists,	heta<1, ain L^1_t:
-mathcal S(t)
-le
-	heta
-u z(t)+a(t)y(t).
-}
-]
+The RED was mechanical:
 
-This is encoded by `G1Audit.MaximalFrontier.G5NSBridge`.
+1. `K4DenseAssembly.lean` used geometric-series proof syntax incompatible
+   with the current pinned Mathlib API.
+2. `K4HabitabilityReduction.lean` declared Type-valued constructors using
+   `theorem` instead of `def`, and used the obsolete identifier
+   `hasCompactSupport_zero`; current Mathlib exposes `HasCompactSupport.zero`.
 
-## K4 factorization inside the one gate
+The `sorryAx` printed during failed elaboration of `zero_tail_control` was
+recovery output caused by the unresolved identifier. It was not present in the
+source; the static source scan had already passed.
 
-The K4 program can be tested as the factorization
+Pre-repair blobs:
 
-[
-mathrm{ActualNS}
-longrightarrow
-mathrm{SignedCZLinearGainTarget}
-longrightarrow
-G1_{mathrm{flex}}.
-]
+- `K4DenseAssembly.lean`: `3b1c090bfc4bdf7c45a5ef87de5111313276c03d`
+- `K4HabitabilityReduction.lean`: `c0ac086af7be9616c822bd85395870a509951990`
 
-The theorem `k4_factorization_closes_G5` proves only that composition.
-Neither arrow is manufactured by a structure field inside the theorem.
+## Maximum real frontier
 
-The current signed-CZ target is
+All lower-level routes are compressed into one problem-specific research gate:
 
-[
-mathrm{FarFieldSqAvg}
-le
-C_{mathrm{far}}
-rac{|omega|_2^2}{ho^3}
-rac rho.
-]
+**G5_NS**
 
-A genuine proof must establish the target for actual NS data and then show that
-this quantitative control is sufficient for flexible signed depletion.
+`ActualNS -> FlexibleG1`
 
-## Why this is the maximal useful compression
+where `FlexibleG1` means that on the target maximal-solution interval there
+exist a scalar `theta` and defect coefficient `a(t)` satisfying:
 
-Earlier audit material decomposed the missing mathematics into several themes:
-joint direction/strain coherence, weighted exceptional-tail control, and an
-energy-integrable nonlinear gain. Those are useful attack surfaces, but they
-all feed the same mathematical output: flexible G1.
+- `0 <= theta < 1`;
+- `a` is integrable in time;
+- `stretching(t) <= theta * nu * z(t) + a(t) * y(t)`.
 
-They therefore remain sub-obligations inside G5_NS, not separate macro-gates.
+The current branch formalizes the exact algebraic consequence:
 
-## If G5_NS existed
+`y'(t) + 2*(1-theta)*nu*z(t) <= 2*a(t)*y(t)`.
 
-With the exact enstrophy balance,
+Thus the three research themes previously separated as joint coherence,
+weighted exceptional-tail control, and energy-integrable nonlinear gain are
+sub-obligations feeding one output. They are not three extra macro-gates.
 
-[
-	frac12 y' + 
-u z = mathcal S,
-]
+## K4 candidate factorization
 
-the repository now proves algebraically that flexible G1 yields
+The current K4 approach is represented as:
 
-[
-y' + 2(1-	heta)
-u z le 2a(t)y.
-]
+`ActualNS -> SignedCZLinearGainTarget -> FlexibleG1`.
 
-If the downstream theorem matches are supplied:
+Both arrows remain OPEN. The composition theorem does not assume either arrow
+inside a hidden structure.
 
-[
-G1_{mathrm{flex}}
-Rightarrow
-sup_{t<T^*}|omega(t)|_2^2<infty
-Rightarrow
-uin L^infty_tL^3_x
-Rightarrow
-	ext{ESS continuation}
-Rightarrow
-T^*=infty.
-]
+## Hypothetical maximum closure
 
-The last three arrows are not promoted merely because they are classical or
-plausible; `DownstreamWiring` keeps their exact theorem obligations visible.
+If G5_NS were proved from actual Navier–Stokes data, and the downstream theorem
+interfaces were matched exactly, the route would be:
 
-## External endpoint reference
+`ActualNS -> FlexibleG1 -> uniform enstrophy -> L-infinity_t L3_x -> ESS continuation -> no finite maximal time`.
 
-Escauriaza–Seregin–Šverák,
-`L_{3,∞}`-solutions of the Navier–Stokes equations and backward uniqueness,
-Russian Mathematical Surveys 58:2 (2003), 211–250,
-DOI 10.1070/RM2003v058n02ABEH000609.
+This is the maximum legitimate hypothetical closure currently identified.
+It is not an unconditional solution claim.
 
-## Status
+## Independent I-core
 
-- internal algebraic compression: candidate for GREEN after CI
-- zero-kernel exclusion: already formalized on source branch
-- explicit Riesz candidate: partial analytic development
-- ActualNS → SignedCZ target: OPEN
-- SignedCZ target → FlexibleG1: OPEN
-- direct ActualNS → FlexibleG1: OPEN
-- unconditional global regularity: NOT ESTABLISHED
+Pinned independently:
+
+- I source SHA: `b8b1da782366a581fccd1118c389a2e191b67f0b`
+- I source tree: `320300ea2a637eaab4e5c052cb3fef3fca65f77c`
+- I audit seal: `919fc815ae713f05e5f8d781636f89e74e8fbbbc`
+- current I-to-NS bridge status: `NO_BRIDGE_CLAIM`
