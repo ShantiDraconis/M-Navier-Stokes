@@ -9,3 +9,6 @@ require mathlib from git
 
 lean_lib G1 where
   srcDir := "Core"
+
+lean_lib Audit8x5 where
+  srcDir := "audit"

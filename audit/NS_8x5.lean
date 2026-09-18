@@ -1,4 +1,4 @@
-import «audit».Universal8x5
+import Universal8x5
 
 namespace NSAudit8x5
 open Audit8x5
@@ -9,10 +9,6 @@ def sourceHeadExact : String :=
 def frozenS1 : String :=
   "ShantiDraconis/M-Navier-Stokes@c56d9632facf96e0a5d834b987b30df5fe2563a1/Core/G1/ClosedClosedClosedTarget.lean::I_core_closed"
 
-/--
-Pre-CI lock state. L7/L8 are intentionally false until the source checkout
-build and no-placebo audit succeed.
--/
 def locksReviewed : Locks :=
   {
     L1 := true
@@ -25,10 +21,6 @@ def locksReviewed : Locks :=
     L8 := false
   }
 
-/--
-Sigma_0 for the exact frozen source. A is not promoted before CI.
-Zero means "MATCH not yet certified", not "the mathematical negation is proved".
--/
 def sigma0 : Sigma :=
   {
     HC := false

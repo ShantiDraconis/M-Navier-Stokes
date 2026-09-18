@@ -45,18 +45,22 @@ jobs:
 
       - name: L3 ENDPOINT_DEFINITION
         run: |
+          set -euo pipefail
           grep -q 'def FinalTarget' _frozen_s1/Core/G1/ClosedClosedClosedTarget.lean
           grep -q 'def ClosedClosedClosedTarget' _frozen_s1/Core/G1/ClosedClosedClosedTarget.lean
 
       - name: L4 COMPRESSION
         run: |
+          set -euo pipefail
           grep -q 'theorem final_of_middle_closed' _frozen_s1/Core/G1/ClosedClosedClosedTarget.lean
           grep -q 'def MiddleClosureTarget' _frozen_s1/Core/G1/ClosedClosedClosedTarget.lean
 
       - name: L5 8x5 semantic audit compiles
         run: |
+          set -euo pipefail
           lake update
           lake exe cache get || true
+          lake build Audit8x5
           lake env lean audit/Universal8x5.lean
           lake env lean audit/NS_8x5.lean
           grep -q '"HC": 0' audit/8x5/NS_8x5_STATE.json
@@ -66,6 +70,7 @@ jobs:
 
       - name: L6 RESIDUE_CLASSIFIER
         run: |
+          set -euo pipefail
           grep -q 'HC: BLOCKING' audit/8x5/NS_8x5_PROTOCOL.md
           grep -q 'Q: BLOCKING' audit/8x5/NS_8x5_PROTOCOL.md
           grep -q 'K: BLOCKING' audit/8x5/NS_8x5_PROTOCOL.md
@@ -74,6 +79,7 @@ jobs:
       - name: L7 BUILD frozen S1
         working-directory: _frozen_s1
         run: |
+          set -euo pipefail
           lake update
           lake exe cache get || true
           lake build IMath
@@ -91,6 +97,7 @@ jobs:
 
       - name: Emission firewall
         run: |
+          set -euo pipefail
           grep -q '"emit_closed_closed_closed": false' audit/8x5/NS_8x5_STATE.json
           echo 'LOCKS_8=TESTED'
           echo 'SIGMA_NS_0=(0,0,0,0,A_pending)'
