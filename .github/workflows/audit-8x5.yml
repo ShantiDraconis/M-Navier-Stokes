@@ -13,13 +13,13 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout audit writer
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 0
           persist-credentials: false
 
       - name: Checkout frozen S1
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: c56d9632facf96e0a5d834b987b30df5fe2563a1
           path: _frozen_s1
@@ -27,25 +27,28 @@ jobs:
           persist-credentials: false
 
       - name: Checkout add-only locked S1 successor
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: cf4e2553ff2234a80dc7f88b7d433a9b1eafc4c0
           path: _s1_locked
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Install Lean
-        run: |
-          curl https://elan.lean-lang.org/elan-init.sh -sSf | sh -s -- -y --default-toolchain leanprover/lean4:v4.32.1
-          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Install exact Lean toolchain
+        uses: leanprover/lean-action@50fcf42d2e460296f1a34b402e990d1b24f8b596
+        with:
+          build: false
+          test: false
+          lint: false
 
       - name: L1 HEAD_EXATO
         run: |
           set -euo pipefail
           test ${#GITHUB_SHA} -eq 40
-          git cat-file -e 6e17fc115336fef1c30797c2a50806c91567b920^{commit}
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           echo "AUDIT_HEAD=$GITHUB_SHA"
-          echo "SOURCE_HEAD=6e17fc115336fef1c30797c2a50806c91567b920"
+          echo "FROZEN_SOURCE_HEAD=c56d9632facf96e0a5d834b987b30df5fe2563a1"
+          echo "LOCK_SUCCESSOR_HEAD=cf4e2553ff2234a80dc7f88b7d433a9b1eafc4c0"
 
       - name: L2 FROZEN_S1
         run: |
@@ -65,10 +68,18 @@ jobs:
           grep -q 'theorem final_of_middle_closed' _frozen_s1/Core/G1/ClosedClosedClosedTarget.lean
           grep -q 'def MiddleClosureTarget' _frozen_s1/Core/G1/ClosedClosedClosedTarget.lean
 
-      - name: L5 8x5 semantic audit compiles
+      - name: L5 8x5 semantic audit compiles from committed lock
         run: |
           set -euo pipefail
-          lake update
+          test -f lake-manifest.json
+          echo "6b7329f16d157be7350dd1fedb61011620be3210fa03d5498380d59e6b109876  lake-manifest.json" | sha256sum -c -
+          jq -e '
+            [.packages[] |
+              select(.name == "mathlib") |
+              select(.inputRev == "v4.32.1") |
+              select(.rev == "520045ab14e26149ee970e2e617ca04b09bde5d6")
+            ] | length == 1
+          ' lake-manifest.json
           lake exe cache get || true
           lake build Audit8x5
           lake env lean audit/Audit8x5.lean
@@ -76,6 +87,7 @@ jobs:
           grep -q '"Q": 0' audit/8x5/NS_8x5_STATE.json
           grep -q '"S": 0' audit/8x5/NS_8x5_STATE.json
           grep -q '"K": 0' audit/8x5/NS_8x5_STATE.json
+          echo "AUDIT_WRITER_LOCK=VERIFIED"
 
       - name: L6 RESIDUE_CLASSIFIER
         run: |
@@ -116,7 +128,7 @@ jobs:
 
       - name: Upload L7a diagnosis
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: l7a-frozen-provenance-${{ github.run_id }}
           path: _frozen_s1/L7a.log
@@ -156,7 +168,7 @@ jobs:
 
       - name: Upload L7b logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: l7b-imath-${{ github.run_id }}
           path: |
@@ -172,7 +184,7 @@ jobs:
 
       - name: Upload L7c log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: l7c-g1-${{ github.run_id }}
           path: _s1_locked/L7c.log
@@ -186,7 +198,7 @@ jobs:
 
       - name: Upload L7d log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: l7d-maximal-frontier-${{ github.run_id }}
           path: _s1_locked/L7d.log
@@ -200,7 +212,7 @@ jobs:
 
       - name: Upload L7e log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: l7e-closed-target-${{ github.run_id }}
           path: _s1_locked/L7e.log
@@ -223,7 +235,7 @@ jobs:
 
       - name: Upload L7f log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: l7f-snapshot-integrity-${{ github.run_id }}
           path: _s1_locked/L7f.log
@@ -239,7 +251,7 @@ jobs:
 
       - name: Upload S1 certification evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: s1-certification-evidence-${{ github.run_id }}
           path: |
