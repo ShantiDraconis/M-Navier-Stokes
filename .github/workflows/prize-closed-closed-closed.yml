@@ -1,0 +1,61 @@
+name: prize-closed-closed-closed
+
+on:
+  push:
+    branches: [audit/ns-maximal-frontier-20260918]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  target-spec:
+    name: Build strict all-closed target specification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lean
+        run: |
+          curl https://elan.lean-lang.org/elan-init.sh -sSf | sh -s -- -y --default-toolchain leanprover/lean4:v4.32.1
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Dependencies
+        run: |
+          lake update
+          lake exe cache get
+      - name: Reject proof gaps
+        run: |
+          if grep -R -n -E '(^|[^[:alnum:]_])(sorry|admit)([^[:alnum:]_]|$)|^[[:space:]]*axiom[[:space:]]|:[[:space:]]*True([[:space:]]|$)' Core Vendor --include='*.lean'; then
+            exit 1
+          fi
+      - name: Build target spec
+        run: lake env lean Core/G1/ClosedClosedClosedTarget.lean
+      - name: Ensure target forbids open stages
+        run: |
+          grep -q 'def ClosedClosedClosedTarget' Core/G1/ClosedClosedClosedTarget.lean
+          grep -q 'ACCEPT_OPEN_IN_FINAL_CERTIFICATE : Bool := false' Core/G1/ClosedClosedClosedTarget.lean
+          echo "TARGET_SPEC=GREEN"
+          echo "PRIZE_CERTIFICATE=NOT_YET_ISSUED"
+
+  prize-certificate:
+    name: Require concrete fully-closed middle certificate
+    runs-on: ubuntu-latest
+    needs: target-spec
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require final concrete proof file
+        run: |
+          test -f Core/G1/PrizeClosureConcrete.lean || {
+            echo "RED: Core/G1/PrizeClosureConcrete.lean does not yet exist."
+            echo "A fully CLOSED middle is required; OPEN is not accepted."
+            exit 1
+          }
+      - name: Require concrete middle and final theorems
+        run: |
+          grep -q 'theorem middle_closed_concrete' Core/G1/PrizeClosureConcrete.lean || {
+            echo "RED: concrete middle theorem missing"
+            exit 1
+          }
+          grep -q 'theorem navier_stokes_global_regularity_closed' Core/G1/PrizeClosureConcrete.lean || {
+            echo "RED: unconditional terminal theorem missing"
+            exit 1
+          }
