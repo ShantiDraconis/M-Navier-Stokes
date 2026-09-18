@@ -1,0 +1,49 @@
+name: certify-ns-maximal-frontier
+
+on:
+  push:
+    branches: [audit/ns-maximal-frontier-20260918]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Lean
+        run: |
+          curl https://elan.lean-lang.org/elan-init.sh -sSf | sh -s -- -y --default-toolchain leanprover/lean4:v4.32.1
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Bootstrap dependencies
+        run: |
+          lake update
+          lake exe cache get
+      - name: Reject proof-gap constructs
+        run: |
+          if grep -R -n -E '\bsorry\b|\badmit\b|^[[:space:]]*axiom[[:space:]]|:[[:space:]]*True([[:space:]]|$)' Core A2 --include='*.lean'; then
+            exit 1
+          fi
+      - name: Build dense G1 union
+        run: lake build G1
+      - name: Compile maximal frontier directly
+        run: lake env lean Core/G1/MaximalFrontier.lean
+      - name: Compile exact divergent imports directly
+        run: |
+          lake env lean Core/G1/K4DenseAssembly.lean
+          lake env lean Core/G1/K4ExplicitRieszKernel.lean
+          lake env lean Core/G1/K4KernelNondegeneracy.lean
+      - name: Preserve laundering firewall
+        run: python3 scripts/check_assumption_laundering.py
+      - name: Scientific boundary
+        run: |
+          grep -q 'def G5NSBridge' Core/G1/MaximalFrontier.lean
+          grep -q 'def ActualNSToK4Target' Core/G1/MaximalFrontier.lean
+          grep -q 'def K4TargetToFlexibleG1' Core/G1/MaximalFrontier.lean
+          grep -q 'theorem final_if_G5_exists' Core/G1/MaximalFrontier.lean
+          echo "CERT_SHA=$GITHUB_SHA"
+          echo "REAL_FRONTIER_COUNT=1"
+          echo "REAL_FRONTIER=ActualNS_to_FlexibleG1"
+          echo "UNCONDITIONAL_NS_REGULARITY=NOT_ESTABLISHED"
