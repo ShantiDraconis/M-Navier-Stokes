@@ -75,18 +75,93 @@ jobs:
           grep -q 'K: BLOCKING' audit/8x5/NS_8x5_PROTOCOL.md
           echo 'RESIDUE_CLASSIFIER=GREEN'
 
-      - name: L7 BUILD frozen S1
+      - name: L7a frozen lake update
+        id: l7a
         working-directory: _frozen_s1
         run: |
           set -euo pipefail
-          lake update
-          lake exe cache get || true
-          # Build the frozen source libraries. IMath is a srcDir=Vendor library;
-          # its root module is IMath, while G1 is the srcDir=Core library.
-          lake build IMath
-          lake build G1
-          lake env lean Core/G1/MaximalFrontier.lean
-          lake env lean Core/G1/ClosedClosedClosedTarget.lean
+          lake update 2>&1 | tee L7a.log
+
+      - name: Upload L7a log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: l7a-lake-update-${{ github.run_id }}
+          path: _frozen_s1/L7a.log
+
+      - name: L7b frozen cache and IMath
+        id: l7b
+        working-directory: _frozen_s1
+        run: |
+          set -euo pipefail
+          (lake exe cache get || true) 2>&1 | tee L7b-cache.log
+          lake build IMath 2>&1 | tee L7b.log
+
+      - name: Upload L7b logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: l7b-imath-${{ github.run_id }}
+          path: |
+            _frozen_s1/L7b-cache.log
+            _frozen_s1/L7b.log
+
+      - name: L7c frozen G1 library
+        id: l7c
+        working-directory: _frozen_s1
+        run: |
+          set -euo pipefail
+          lake build G1 2>&1 | tee L7c.log
+
+      - name: Upload L7c log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: l7c-g1-${{ github.run_id }}
+          path: _frozen_s1/L7c.log
+
+      - name: L7d MaximalFrontier
+        id: l7d
+        working-directory: _frozen_s1
+        run: |
+          set -euo pipefail
+          lake env lean Core/G1/MaximalFrontier.lean 2>&1 | tee L7d.log
+
+      - name: Upload L7d log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: l7d-maximal-frontier-${{ github.run_id }}
+          path: _frozen_s1/L7d.log
+
+      - name: L7e ClosedClosedClosedTarget
+        id: l7e
+        working-directory: _frozen_s1
+        run: |
+          set -euo pipefail
+          lake env lean Core/G1/ClosedClosedClosedTarget.lean 2>&1 | tee L7e.log
+
+      - name: Upload L7e log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: l7e-closed-target-${{ github.run_id }}
+          path: _frozen_s1/L7e.log
+
+      - name: L7f frozen snapshot integrity
+        id: l7f
+        working-directory: _frozen_s1
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "c56d9632facf96e0a5d834b987b30df5fe2563a1"
+          git diff --exit-code -- Core Vendor lakefile.lean lean-toolchain 2>&1 | tee L7f.log
+
+      - name: Upload L7f log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: l7f-snapshot-integrity-${{ github.run_id }}
+          path: _frozen_s1/L7f.log
 
       - name: L8 NO-PLACEBO frozen source
         working-directory: _frozen_s1
