@@ -23,14 +23,11 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Free runner disk before Lean setup
+      - name: Record runner disk before Lean setup
         shell: bash
         run: |
           set -euo pipefail
           df -h | tee /tmp/openai-ns-disk-before.txt
-          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc || true
-          rm -rf ~/.cache/* || true
-          df -h | tee /tmp/openai-ns-disk-after-cleanup.txt
 
       - name: Install pinned upstream Lean
         uses: leanprover/lean-action@50fcf42d2e460296f1a34b402e990d1b24f8b596
@@ -152,7 +149,6 @@ jobs:
           name: openai-ns-final-proof-audit-${{ github.run_id }}
           path: |
             /tmp/openai-ns-disk-before.txt
-            /tmp/openai-ns-disk-after-cleanup.txt
             /tmp/openai-ns-disk-after-toolchain.txt
             /tmp/openai-ns-input-hashes.txt
             /tmp/openai-ns-lean-version.txt
