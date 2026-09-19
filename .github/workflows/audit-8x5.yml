@@ -206,9 +206,9 @@ jobs:
           sha256sum lake-manifest.json | tee /tmp/L7b-diag/manifest-hash.txt
           cp lake-manifest.json /tmp/L7b-diag/manifest.json
           git rev-parse HEAD | tee /tmp/L7b-diag/S1_SUCCESSOR_SHA.txt
-          git rev-parse HEAD^ | tee /tmp/L7b-diag/S1_PARENT_SHA.txt
+          git show -s --format=%P HEAD | tee /tmp/L7b-diag/S1_PARENT_SHA.txt
           git rev-parse HEAD^{tree} | tee /tmp/L7b-diag/S1_SUCCESSOR_TREE.txt
-          git rev-parse HEAD^^{tree} | tee /tmp/L7b-diag/S1_PARENT_TREE.txt
+          git show -s --format=%T c56d9632facf96e0a5d834b987b30df5fe2563a1 | tee /tmp/L7b-diag/S1_PARENT_TREE.txt
 
       - name: L7b cache get isolated
         id: l7b_cache
