@@ -60,14 +60,26 @@ jobs:
           ' lake-manifest.json
           sha256sum lean-toolchain lakefile.toml lake-manifest.json formalization.yaml ComparatorChallenges/NavierStokes.json             | tee /tmp/openai-ns-input-hashes.txt
 
+      - name: Free runner disk for pinned upstream toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          df -h | tee /tmp/openai-ns-disk-before.txt
+          elan toolchain uninstall leanprover/lean4:v4.32.1 || true
+          rm -rf .lake ~/.cache/lean ~/.cache/mathlib ~/.cache/lake || true
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc || true
+          df -h | tee /tmp/openai-ns-disk-after-cleanup.txt
+
       - name: Install exact upstream Lean toolchain
         working-directory: _openai_ns
         shell: bash
         run: |
           set -euo pipefail
           elan toolchain install leanprover/lean4:v4.34.0-rc2
+          test "$(lean --version | sed -n 's/^Lean (version \([^,]*\).*/\1/p')" = "4.34.0-rc2"
           lean --version | tee /tmp/openai-ns-lean-version.txt
           lake --version | tee /tmp/openai-ns-lake-version.txt
+          df -h | tee /tmp/openai-ns-disk-after-toolchain.txt
 
       - name: G1 obtain pinned dependency cache
         working-directory: _openai_ns
@@ -159,6 +171,9 @@ jobs:
           name: openai-ns-final-proof-audit-${{ github.run_id }}
           path: |
             /tmp/openai-ns-input-hashes.txt
+            /tmp/openai-ns-disk-before.txt
+            /tmp/openai-ns-disk-after-cleanup.txt
+            /tmp/openai-ns-disk-after-toolchain.txt
             /tmp/openai-ns-lean-version.txt
             /tmp/openai-ns-lake-version.txt
             /tmp/openai-ns-cache.log
