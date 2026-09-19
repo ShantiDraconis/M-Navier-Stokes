@@ -74,7 +74,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          lake env lean NavierStokes/ComparatorSolution.lean 2>&1 | tee /tmp/openai-ns-solution-build.log
+          lake build NavierStokes.ComparatorSolution 2>&1 | tee /tmp/openai-ns-solution-build.log
+          lake env lean NavierStokes/ComparatorSolution.lean 2>&1 | tee -a /tmp/openai-ns-solution-build.log
 
       - name: G3 comparator statement and proof validation
         timeout-minutes: 45
