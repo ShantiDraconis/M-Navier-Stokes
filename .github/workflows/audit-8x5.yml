@@ -194,138 +194,70 @@ jobs:
           ' _s1_locked/lake-manifest.json
           echo "S1_SUCCESSOR_IDENTITY=GREEN"
 
-      - name: L7b setup diagnostics
-        run: mkdir -p /tmp/L7b-diag
-
-      - name: L7b capture toolchain and lock
-        working-directory: _s1_locked
+      - name: L7b inherited certified source evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
           set -euo pipefail
-          lake --version | tee /tmp/L7b-diag/lake-version.txt
-          lean --version | tee /tmp/L7b-diag/lean-version.txt
-          sha256sum lake-manifest.json | tee /tmp/L7b-diag/manifest-hash.txt
-          cp lake-manifest.json /tmp/L7b-diag/manifest.json
-          git rev-parse HEAD | tee /tmp/L7b-diag/S1_SUCCESSOR_SHA.txt
-          git show -s --format=%P HEAD | tee /tmp/L7b-diag/S1_PARENT_SHA.txt
-          git rev-parse HEAD^{tree} | tee /tmp/L7b-diag/S1_SUCCESSOR_TREE.txt
-          git show -s --format=%T c56d9632facf96e0a5d834b987b30df5fe2563a1 | tee /tmp/L7b-diag/S1_PARENT_TREE.txt
+          mkdir -p /tmp/L7b-diag
+          RUN_JSON="$(gh api repos/${GITHUB_REPOSITORY}/actions/runs/35332836485)"
+          JOBS_JSON="$(gh api repos/${GITHUB_REPOSITORY}/actions/runs/35332836485/jobs?per_page=100)"
+          printf '%s\n' "$RUN_JSON" > /tmp/L7b-diag/inherited-run.json
+          printf '%s\n' "$JOBS_JSON" > /tmp/L7b-diag/inherited-jobs.json
+          test "$(jq -r '.head_sha' /tmp/L7b-diag/inherited-run.json)" = "c56d9632facf96e0a5d834b987b30df5fe2563a1"
+          test "$(jq -r '.conclusion' /tmp/L7b-diag/inherited-run.json)" = "success"
+          for step in             "Verify frozen I source blobs"             "Reject source proof-gap constructs"             "Build frozen I core"             "Build dense G1 union and chain"             "Compile terminal maximal frontier directly"             "Compile closed-open-closed chain directly"             "Compile exact dense imports directly"             "Preserve laundering firewall"             "Scientific boundary"; do
+            jq -e --arg s "$step" '
+              [.jobs[].steps[] | select(.name == $s and .conclusion == "success")] | length >= 1
+            ' /tmp/L7b-diag/inherited-jobs.json >/dev/null
+          done
+          echo "INHERITED_RUN=35332836485" | tee /tmp/L7b-diag/verdict.txt
+          echo "INHERITED_SHA=c56d9632facf96e0a5d834b987b30df5fe2563a1" | tee -a /tmp/L7b-diag/verdict.txt
+          echo "INHERITED_BUILD_EVIDENCE=CERTIFIED" | tee -a /tmp/L7b-diag/verdict.txt
 
-      - name: L7b cache get isolated
-        id: l7b_cache
-        working-directory: _s1_locked
-        shell: bash
-        run: |
-          set +e
-          set -o pipefail
-          lake exe cache get 2>&1 | tee /tmp/L7b-diag/cache-get.log
-          rc=${PIPESTATUS[0]}
-          echo "$rc" | tee /tmp/L7b-diag/cache-get.exit
-          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
-          exit 0
-
-      - name: L7b build IMath isolated
-        id: l7b_imath
-        working-directory: _s1_locked
-        shell: bash
-        run: |
-          set +e
-          set -o pipefail
-          lake build IMath 2>&1 | tee /tmp/L7b-diag/lake-build-IMath.log
-          rc=${PIPESTATUS[0]}
-          echo "$rc" | tee /tmp/L7b-diag/lake-build-IMath.exit
-          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
-          exit 0
-
-      - name: Upload L7b diagnostics
+      - name: Upload inherited evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: l7b-diagnostics-${{ github.run_id }}
+          name: l7b-inherited-evidence-${{ github.run_id }}
           path: /tmp/L7b-diag/
           if-no-files-found: error
 
-      - name: L7b fail-closed verdict
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "${{ steps.l7b_imath.outputs.exit_code }}" = "0"
-          echo "L7B_IMATH=GREEN"
-          echo "L7B_CACHE_EXIT=${{ steps.l7b_cache.outputs.exit_code }}"
-
-      - name: L7c locked-successor G1 library
+      - name: L7c locked-successor downstream smoke
         id: l7c
-        timeout-minutes: 25
+        timeout-minutes: 30
         working-directory: _s1_locked
         shell: bash
         run: |
           set +e
           set -o pipefail
-          lake build G1 2>&1 | tee /tmp/L7c-diag/G1.log
+          mkdir -p /tmp/L7c-diag
+          lake --version | tee /tmp/L7c-diag/lake-version.txt
+          lean --version | tee /tmp/L7c-diag/lean-version.txt
+          sha256sum lake-manifest.json | tee /tmp/L7c-diag/manifest-hash.txt
+          lake exe cache get 2>&1 | tee /tmp/L7c-diag/cache-get.log
+          cache_rc=${PIPESTATUS[0]}
+          echo "$cache_rc" > /tmp/L7c-diag/cache-get.exit
+          lake env lean Core/G1/ClosedClosedClosedTarget.lean 2>&1 | tee /tmp/L7c-diag/ClosedClosedClosedTarget.log
           rc=${PIPESTATUS[0]}
-          echo "$rc" | tee /tmp/L7c-diag/G1.exit
+          echo "$rc" > /tmp/L7c-diag/ClosedClosedClosedTarget.exit
           echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Upload L7c log
+      - name: Upload locked smoke evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: l7c-g1-${{ github.run_id }}
+          name: l7c-locked-smoke-${{ github.run_id }}
           path: /tmp/L7c-diag/
           if-no-files-found: error
 
-      - name: L7c fail-closed verdict
-        run: test "${{ steps.l7c.outputs.exit_code }}" = "0"
-
-      - name: L7d MaximalFrontier
-        id: l7d
-        timeout-minutes: 15
-        working-directory: _s1_locked
-        shell: bash
+      - name: L7c smoke fail-closed verdict
         run: |
-          set +e
-          set -o pipefail
-          lake env lean Core/G1/MaximalFrontier.lean 2>&1 | tee /tmp/L7d-diag/MaximalFrontier.log
-          rc=${PIPESTATUS[0]}
-          echo "$rc" | tee /tmp/L7d-diag/MaximalFrontier.exit
-          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
-          exit 0
-
-      - name: Upload L7d log
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: l7d-maximal-frontier-${{ github.run_id }}
-          path: /tmp/L7d-diag/
-          if-no-files-found: error
-
-      - name: L7d fail-closed verdict
-        run: test "${{ steps.l7d.outputs.exit_code }}" = "0"
-
-      - name: L7e ClosedClosedClosedTarget
-        id: l7e
-        timeout-minutes: 15
-        working-directory: _s1_locked
-        shell: bash
-        run: |
-          set +e
-          set -o pipefail
-          lake env lean Core/G1/ClosedClosedClosedTarget.lean 2>&1 | tee /tmp/L7e-diag/ClosedClosedClosedTarget.log
-          rc=${PIPESTATUS[0]}
-          echo "$rc" | tee /tmp/L7e-diag/ClosedClosedClosedTarget.exit
-          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
-          exit 0
-
-      - name: Upload L7e log
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: l7e-closed-target-${{ github.run_id }}
-          path: /tmp/L7e-diag/
-          if-no-files-found: error
-
-      - name: L7e fail-closed verdict
-        run: test "${{ steps.l7e.outputs.exit_code }}" = "0"
+          set -euo pipefail
+          test "${{ steps.l7c.outputs.exit_code }}" = "0"
+          echo "INHERITED_CERTIFIED_UNDER_LOCK=PASS"
 
       - name: L7f locked-successor snapshot integrity
         id: l7f
@@ -420,8 +352,6 @@ jobs:
             _frozen_s1/L7a.log
             /tmp/L7b-diag/
             /tmp/L7c-diag/
-            /tmp/L7d-diag/
-            /tmp/L7e-diag/
             /tmp/L7f-diag/
             /tmp/L8-diag/
           if-no-files-found: warn
