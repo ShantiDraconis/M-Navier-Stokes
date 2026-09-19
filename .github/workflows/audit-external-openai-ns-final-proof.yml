@@ -15,21 +15,24 @@ jobs:
   verify-final-proof:
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout audit writer
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          persist-credentials: false
-
-      - name: Checkout pinned OpenAI formalization
+      - name: Checkout pinned OpenAI formalization as audit root
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: openai/NavierStokesAndEuler
           ref: f9e8bc5b38b6e212696e8a30e3e91517af887bbd
-          path: _openai_ns
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Install elan
+      - name: Free runner disk before Lean setup
+        shell: bash
+        run: |
+          set -euo pipefail
+          df -h | tee /tmp/openai-ns-disk-before.txt
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc || true
+          rm -rf ~/.cache/* || true
+          df -h | tee /tmp/openai-ns-disk-after-cleanup.txt
+
+      - name: Install pinned upstream Lean
         uses: leanprover/lean-action@50fcf42d2e460296f1a34b402e990d1b24f8b596
         with:
           build: false
@@ -37,13 +40,13 @@ jobs:
           lint: false
 
       - name: G0 exact upstream identity and lock
-        working-directory: _openai_ns
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "f9e8bc5b38b6e212696e8a30e3e91517af887bbd"
           test "$(cat lean-toolchain)" = "leanprover/lean4:v4.34.0-rc2"
           test -f lake-manifest.json
+          test "$(lean --version | sed -n 's/^Lean (version \([^,]*\).*/\1/p')" = "4.34.0-rc2"
           jq -e '
             [.packages[] |
               select(.name == "mathlib") |
@@ -58,38 +61,18 @@ jobs:
               select(.rev == "19e111e2141cf333c7daff0f64c5f24acc91dd2e")
             ] | length == 1
           ' lake-manifest.json
-          sha256sum lean-toolchain lakefile.toml lake-manifest.json formalization.yaml ComparatorChallenges/NavierStokes.json             | tee /tmp/openai-ns-input-hashes.txt
-
-      - name: Free runner disk for pinned upstream toolchain
-        shell: bash
-        run: |
-          set -euo pipefail
-          df -h | tee /tmp/openai-ns-disk-before.txt
-          elan toolchain uninstall leanprover/lean4:v4.32.1 || true
-          rm -rf .lake ~/.cache/lean ~/.cache/mathlib ~/.cache/lake || true
-          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc || true
-          df -h | tee /tmp/openai-ns-disk-after-cleanup.txt
-
-      - name: Install exact upstream Lean toolchain
-        working-directory: _openai_ns
-        shell: bash
-        run: |
-          set -euo pipefail
-          elan toolchain install leanprover/lean4:v4.34.0-rc2
-          test "$(lean --version | sed -n 's/^Lean (version \([^,]*\).*/\1/p')" = "4.34.0-rc2"
           lean --version | tee /tmp/openai-ns-lean-version.txt
           lake --version | tee /tmp/openai-ns-lake-version.txt
+          sha256sum lean-toolchain lakefile.toml lake-manifest.json formalization.yaml ComparatorChallenges/NavierStokes.json             | tee /tmp/openai-ns-input-hashes.txt
           df -h | tee /tmp/openai-ns-disk-after-toolchain.txt
 
       - name: G1 obtain pinned dependency cache
-        working-directory: _openai_ns
         shell: bash
         run: |
           set -euo pipefail
           lake exe cache get 2>&1 | tee /tmp/openai-ns-cache.log
 
       - name: G2 compile submitted final proof module
-        working-directory: _openai_ns
         timeout-minutes: 45
         shell: bash
         run: |
@@ -97,7 +80,6 @@ jobs:
           lake env lean NavierStokes/ComparatorSolution.lean 2>&1 | tee /tmp/openai-ns-solution-build.log
 
       - name: G3 comparator statement and proof validation
-        working-directory: _openai_ns
         timeout-minutes: 45
         shell: bash
         run: |
@@ -105,7 +87,6 @@ jobs:
           lake exe comparator ComparatorChallenges/NavierStokes.json 2>&1 | tee /tmp/openai-ns-comparator.log
 
       - name: G4 final theorem axiom footprints
-        working-directory: _openai_ns
         shell: bash
         run: |
           set -euo pipefail
@@ -134,8 +115,7 @@ jobs:
           print('FINAL_AXIOM_FOOTPRINT=PASS')
           PY
 
-      - name: G5 metadata anti-placeholder assertions
-        working-directory: _openai_ns
+      - name: G5 metadata and import firewall
         shell: bash
         run: |
           set -euo pipefail
@@ -144,7 +124,8 @@ jobs:
           grep -q 'declaration: "NavierStokes.Comparator.navier_stokes_breakdown_periodic"' formalization.yaml
           grep -q '"solution_module": "NavierStokes.ComparatorSolution"' ComparatorChallenges/NavierStokes.json
           grep -q '"enable_nanoda": true' ComparatorChallenges/NavierStokes.json
-          ! grep -q 'ComparatorChallenges.NavierStokes' NavierStokes/ComparatorSolution.lean
+          ! grep -q '^import ComparatorChallenges.NavierStokes' NavierStokes/ComparatorSolution.lean
+          ! grep -R -n -E '(^|[^[:alnum:]_])(sorry|admit)([^[:alnum:]_]|$)|^[[:space:]]*axiom[[:space:]]'             NavierStokes/ComparatorSolution.lean             NavierStokes/ComparatorTheorem.lean             NavierStokes/ComparatorR3Theorem.lean             NavierStokes/ComparatorBridge.lean
           echo "FINAL_METADATA_FIREWALL=PASS"
 
       - name: Emit formal proof audit verdict
@@ -170,10 +151,10 @@ jobs:
         with:
           name: openai-ns-final-proof-audit-${{ github.run_id }}
           path: |
-            /tmp/openai-ns-input-hashes.txt
             /tmp/openai-ns-disk-before.txt
             /tmp/openai-ns-disk-after-cleanup.txt
             /tmp/openai-ns-disk-after-toolchain.txt
+            /tmp/openai-ns-input-hashes.txt
             /tmp/openai-ns-lean-version.txt
             /tmp/openai-ns-lake-version.txt
             /tmp/openai-ns-cache.log
