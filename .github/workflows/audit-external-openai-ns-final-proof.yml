@@ -1,0 +1,169 @@
+name: audit-external-openai-ns-final-proof
+
+on:
+  push:
+    branches: [audit/multistate-proof-refutation-v1]
+    paths:
+      - '.github/workflows/audit-external-openai-ns-final-proof.yml'
+      - 'audit/external-openai-ns/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-final-proof:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout audit writer
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Checkout pinned OpenAI formalization
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: openai/NavierStokesAndEuler
+          ref: f9e8bc5b38b6e212696e8a30e3e91517af887bbd
+          path: _openai_ns
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Install elan
+        uses: leanprover/lean-action@50fcf42d2e460296f1a34b402e990d1b24f8b596
+        with:
+          build: false
+          test: false
+          lint: false
+
+      - name: G0 exact upstream identity and lock
+        working-directory: _openai_ns
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "f9e8bc5b38b6e212696e8a30e3e91517af887bbd"
+          test "$(cat lean-toolchain)" = "leanprover/lean4:v4.34.0-rc2"
+          test -f lake-manifest.json
+          jq -e '
+            [.packages[] |
+              select(.name == "mathlib") |
+              select(.inputRev == "v4.34.0-rc2") |
+              select(.rev == "85e3a25e006c35636f0e53b0e9296caca2685bc0")
+            ] | length == 1
+          ' lake-manifest.json
+          jq -e '
+            [.packages[] |
+              select(.name == "Comparator") |
+              select(.inputRev == "v4.34.0-rc2") |
+              select(.rev == "19e111e2141cf333c7daff0f64c5f24acc91dd2e")
+            ] | length == 1
+          ' lake-manifest.json
+          sha256sum lean-toolchain lakefile.toml lake-manifest.json formalization.yaml ComparatorChallenges/NavierStokes.json             | tee /tmp/openai-ns-input-hashes.txt
+
+      - name: Install exact upstream Lean toolchain
+        working-directory: _openai_ns
+        shell: bash
+        run: |
+          set -euo pipefail
+          elan toolchain install leanprover/lean4:v4.34.0-rc2
+          lean --version | tee /tmp/openai-ns-lean-version.txt
+          lake --version | tee /tmp/openai-ns-lake-version.txt
+
+      - name: G1 obtain pinned dependency cache
+        working-directory: _openai_ns
+        shell: bash
+        run: |
+          set -euo pipefail
+          lake exe cache get 2>&1 | tee /tmp/openai-ns-cache.log
+
+      - name: G2 compile submitted final proof module
+        working-directory: _openai_ns
+        timeout-minutes: 45
+        shell: bash
+        run: |
+          set -euo pipefail
+          lake env lean NavierStokes/ComparatorSolution.lean 2>&1 | tee /tmp/openai-ns-solution-build.log
+
+      - name: G3 comparator statement and proof validation
+        working-directory: _openai_ns
+        timeout-minutes: 45
+        shell: bash
+        run: |
+          set -euo pipefail
+          lake exe comparator ComparatorChallenges/NavierStokes.json 2>&1 | tee /tmp/openai-ns-comparator.log
+
+      - name: G4 final theorem axiom footprints
+        working-directory: _openai_ns
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat >/tmp/OpenAINSFinalChecks.lean <<'EOF'
+          import NavierStokes.ComparatorSolution
+          #print axioms NavierStokes.Comparator.navier_stokes_breakdown_R3
+          #print axioms NavierStokes.Comparator.navier_stokes_breakdown_periodic
+          EOF
+          lake env lean /tmp/OpenAINSFinalChecks.lean 2>&1 | tee /tmp/openai-ns-axioms.log
+          test "$(grep -c 'depends on axioms:' /tmp/openai-ns-axioms.log)" -eq 2
+          ! grep -q 'sorryAx' /tmp/openai-ns-axioms.log
+          python3 - <<'PY'
+          import re, sys
+          p='/tmp/openai-ns-axioms.log'
+          allowed={'propext','Classical.choice','Quot.sound'}
+          lines=[x.strip() for x in open(p,encoding='utf-8',errors='replace') if 'depends on axioms:' in x]
+          if len(lines)!=2:
+              print('AXIOM_PARSE_COUNT_FAIL',len(lines)); sys.exit(1)
+          for line in lines:
+              m=re.search(r'depends on axioms: \[([^]]*)\]', line)
+              if not m:
+                  print('AXIOM_PARSE_FAIL',line); sys.exit(1)
+              got={x.strip() for x in m.group(1).split(',') if x.strip()}
+              if got != allowed:
+                  print('AXIOM_FOOTPRINT_FAIL',sorted(got)); sys.exit(1)
+          print('FINAL_AXIOM_FOOTPRINT=PASS')
+          PY
+
+      - name: G5 metadata anti-placeholder assertions
+        working-directory: _openai_ns
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'sorry_count: 0' formalization.yaml
+          grep -q 'declaration: "NavierStokes.Comparator.navier_stokes_breakdown_R3"' formalization.yaml
+          grep -q 'declaration: "NavierStokes.Comparator.navier_stokes_breakdown_periodic"' formalization.yaml
+          grep -q '"solution_module": "NavierStokes.ComparatorSolution"' ComparatorChallenges/NavierStokes.json
+          grep -q '"enable_nanoda": true' ComparatorChallenges/NavierStokes.json
+          ! grep -q 'ComparatorChallenges.NavierStokes' NavierStokes/ComparatorSolution.lean
+          echo "FINAL_METADATA_FIREWALL=PASS"
+
+      - name: Emit formal proof audit verdict
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "UPSTREAM_REPO=openai/NavierStokesAndEuler"
+            echo "UPSTREAM_SHA=f9e8bc5b38b6e212696e8a30e3e91517af887bbd"
+            echo "THEOREM_C=NavierStokes.Comparator.navier_stokes_breakdown_R3"
+            echo "THEOREM_D=NavierStokes.Comparator.navier_stokes_breakdown_periodic"
+            echo "COMPARATOR=PASS"
+            echo "SORRY_AX=0"
+            echo "PERMITTED_AXIOMS=propext,Classical.choice,Quot.sound"
+            echo "FINAL_PROOF_FORMAL_C_D=PASS"
+            echo "EXTERNAL_PEER_REVIEW=NOT_CERTIFIED_BY_THIS_WORKFLOW"
+            echo "MATHEMATICAL_PROMOTION_LOCAL_G5=false"
+          } | tee /tmp/openai-ns-final-verdict.txt
+
+      - name: Upload final proof evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: openai-ns-final-proof-audit-${{ github.run_id }}
+          path: |
+            /tmp/openai-ns-input-hashes.txt
+            /tmp/openai-ns-lean-version.txt
+            /tmp/openai-ns-lake-version.txt
+            /tmp/openai-ns-cache.log
+            /tmp/openai-ns-solution-build.log
+            /tmp/openai-ns-comparator.log
+            /tmp/openai-ns-axioms.log
+            /tmp/openai-ns-final-verdict.txt
+          if-no-files-found: warn
