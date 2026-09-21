@@ -1,0 +1,49 @@
+name: certify-g5-direct-source
+
+on:
+  push:
+    branches: [attack/g5-direct-full-20260921]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  certify-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Lean
+        run: |
+          curl https://elan.lean-lang.org/elan-init.sh -sSf | sh -s -- -y --default-toolchain leanprover/lean4:v4.32.1
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Bootstrap dependencies
+        run: |
+          lake update
+          lake exe cache get
+
+      - name: Reject proof-gap constructs in G5 source
+        run: |
+          if grep -n -E '(^|[^[:alnum:]_])(sorry|admit|sorryAx)([^[:alnum:]_]|$)|^[[:space:]]*axiom[[:space:]]|:[[:space:]]*True([[:space:]]|$)' Core/G1/G5DirectFull.lean; then
+            exit 1
+          fi
+
+      - name: Build G1
+        run: lake build G1
+
+      - name: Compile G5 direct file
+        run: lake env lean Core/G1/G5DirectFull.lean
+
+      - name: Preserve scientific boundary
+        run: |
+          grep -q 'def G5DirectProducer' Core/G1/G5DirectFull.lean
+          grep -q 'def ThetaSubcritical' Core/G1/G5DirectFull.lean
+          grep -q 'def DefectIntervalL1' Core/G1/G5DirectFull.lean
+          grep -q 'theorem g5DirectProducer_iff_G5NSBridge' Core/G1/G5DirectFull.lean
+          grep -q 'def G5_DIRECT_STATUS : String := "OPEN_MATH"' Core/G1/G5DirectFull.lean
+          grep -q 'def FINAL_NS_PROOF_STATUS : String := "0"' Core/G1/G5DirectFull.lean
+          echo "G5_SOURCE_BUILD=PASS"
+          echo "G5_DIRECT=OPEN_MATH"
+          echo "FINAL_NS_PROOF=0"
